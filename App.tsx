@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
 import { Layout } from './components/Layout';
 import { hybridStorage } from './services/hybridStorageService';
 import { initSupabase, checkConnection } from './services/supabaseClient';
@@ -23,7 +22,33 @@ import LandingPage from './pages/LandingPage';
 import SharedProfilePage from './pages/SharedProfilePage';
 import SettingsPage from './pages/SettingsPage';
 
-function AppContent() {
+export default function App() {
+  useEffect(() => {
+    const initializeApp = async () => {
+      console.log('🚀 Initializing Sacred Core...');
+      
+      try {
+        // Initialize Supabase (graceful fail if not configured)
+        initSupabase();
+        
+        // Initialize hybrid storage
+        await hybridStorage.initialize();
+        
+        // Check Supabase connection
+        const isConnected = await checkConnection();
+        if (isConnected) {
+          console.log('✅ App initialized with cloud sync');
+        } else {
+          console.log('⚠️ App initialized in offline mode');
+        }
+      } catch (error) {
+        console.warn('⚠️ Initialization error (running in fallback mode):', error);
+      }
+    };
+
+    initializeApp();
+  }, []);
+
   return (
     <HashRouter>
       <Layout>
@@ -48,35 +73,5 @@ function AppContent() {
         </Routes>
       </Layout>
     </HashRouter>
-  );
-}
-
-export default function App() {
-  useEffect(() => {
-    const initializeApp = async () => {
-      console.log('🚀 Initializing Sacred Core...');
-      
-      // Initialize Supabase
-      initSupabase();
-      
-      // Initialize hybrid storage
-      await hybridStorage.initialize();
-      
-      // Check Supabase connection
-      const isConnected = await checkConnection();
-      if (isConnected) {
-        console.log('✅ App initialized with cloud sync');
-      } else {
-        console.log('⚠️ App initialized in offline mode');
-      }
-    };
-
-    initializeApp().catch(console.error);
-  }, []);
-
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
   );
 }
