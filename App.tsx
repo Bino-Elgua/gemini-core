@@ -22,6 +22,7 @@ import SiteBuilderPage from './pages/SiteBuilderPage';
 import LandingPage from './pages/LandingPage';
 import SharedProfilePage from './pages/SharedProfilePage';
 import SettingsPage from './pages/SettingsPage';
+import AdminDashboard from './pages/AdminDashboard';
 
 export default function App() {
   useEffect(() => {
@@ -78,6 +79,7 @@ export default function App() {
             <Route path="/automations" element={<AutomationsPage />} />
             <Route path="/battle" element={<BattleModePage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/landing" element={<LandingPage />} />
             <Route path="/share/:id" element={<SharedProfilePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
