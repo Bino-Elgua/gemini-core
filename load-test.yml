@@ -1,0 +1,77 @@
+config:
+  target: "http://localhost:3003"
+  phases:
+    - duration: 30
+      arrivalRate: 10
+      name: "Warm up"
+    - duration: 120
+      arrivalRate: 50
+      name: "Ramp up"
+    - duration: 120
+      arrivalRate: 100
+      name: "Sustained load"
+    - duration: 30
+      arrivalRate: 0
+      name: "Ramp down"
+  processor: "./load-test-processor.js"
+  http:
+    timeout: 10
+  variables:
+    baseUrl: "http://localhost:3003"
+
+scenarios:
+  - name: "Dashboard Load"
+    weight: 40
+    flow:
+      - get:
+          url: "/"
+          expect:
+            - statusCode: 200
+      - think: 2
+      - get:
+          url: "/#/campaigns"
+          expect:
+            - statusCode: 200
+      - think: 1
+
+  - name: "Campaign Creation Workflow"
+    weight: 35
+    flow:
+      - get:
+          url: "/"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "/#/campaigns"
+          expect:
+            - statusCode: 200
+      - think: 2
+
+  - name: "Extract & Content Generation"
+    weight: 15
+    flow:
+      - get:
+          url: "/"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "/#/extract"
+          expect:
+            - statusCode: 200
+      - think: 2
+
+  - name: "Admin Dashboard Access"
+    weight: 10
+    flow:
+      - get:
+          url: "/"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "/#/admin"
+          expect:
+            - statusCode: 200
+      - think: 2
