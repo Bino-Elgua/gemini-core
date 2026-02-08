@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { hybridStorage } from './services/hybridStorageService';
 import { initSupabase, checkConnection } from './services/supabaseClient';
+import { sentryService, SentryErrorBoundary } from './services/sentryService';
 
 // Pages
 import DashboardPage from './pages/DashboardPage';
@@ -28,6 +29,9 @@ export default function App() {
       console.log('🚀 Initializing Sacred Core...');
       
       try {
+        // Initialize Sentry for error tracking (first, before other services)
+        sentryService.initialize();
+        
         // Initialize Supabase (graceful fail if not configured)
         initSupabase();
         
@@ -43,6 +47,7 @@ export default function App() {
         }
       } catch (error) {
         console.warn('⚠️ Initialization error (running in fallback mode):', error);
+        sentryService.captureException(error, { context: 'app_initialization' });
       }
     };
 
@@ -50,28 +55,35 @@ export default function App() {
   }, []);
 
   return (
-    <HashRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/extract" element={<ExtractPage />} />
-          <Route path="/simulator" element={<BrandSimulatorPage />} />
-          <Route path="/campaigns" element={<CampaignsPage />} />
-          <Route path="/agents" element={<AgentForgePage />} />
-          <Route path="/builder" element={<SiteBuilderPage />} />
-          <Route path="/scheduler" element={<SchedulerPage />} />
-          <Route path="/leads" element={<LeadHunterPage />} />
-          <Route path="/sonic" element={<SonicLabPage />} />
-          <Route path="/live" element={<LiveSessionPage />} />
-          <Route path="/affiliate" element={<AffiliateHubPage />} />
-          <Route path="/automations" element={<AutomationsPage />} />
-          <Route path="/battle" element={<BattleModePage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/landing" element={<LandingPage />} />
-          <Route path="/share/:id" element={<SharedProfilePage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
-    </HashRouter>
+    <SentryErrorBoundary fallback={
+      <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
+        <h2>Application Error</h2>
+        <p>Something went wrong. Please refresh the page.</p>
+      </div>
+    } showDialog>
+      <HashRouter>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/extract" element={<ExtractPage />} />
+            <Route path="/simulator" element={<BrandSimulatorPage />} />
+            <Route path="/campaigns" element={<CampaignsPage />} />
+            <Route path="/agents" element={<AgentForgePage />} />
+            <Route path="/builder" element={<SiteBuilderPage />} />
+            <Route path="/scheduler" element={<SchedulerPage />} />
+            <Route path="/leads" element={<LeadHunterPage />} />
+            <Route path="/sonic" element={<SonicLabPage />} />
+            <Route path="/live" element={<LiveSessionPage />} />
+            <Route path="/affiliate" element={<AffiliateHubPage />} />
+            <Route path="/automations" element={<AutomationsPage />} />
+            <Route path="/battle" element={<BattleModePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/landing" element={<LandingPage />} />
+            <Route path="/share/:id" element={<SharedProfilePage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Layout>
+      </HashRouter>
+    </SentryErrorBoundary>
   );
 }
