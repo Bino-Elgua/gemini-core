@@ -228,71 +228,68 @@ interface FeatureFlagsState {
   refresh: () => Promise<void>;
 }
 
-export const useFeatureFlags = create<FeatureFlagsState>()(
-  async (set) => {
-    // Initial load
-    try {
-      const flags = await featureFlagService.getAllFlags();
-      set({
-        videoGeneration: flags.video_generation ?? true,
-        imageGeneration: flags.image_generation ?? true,
-        competitorAnalysis: flags.competitor_analysis ?? true,
-        aiOptimization: flags.ai_optimization ?? true,
-        advancedAnalytics: flags.advanced_analytics ?? true,
-        affiliateProgram: flags.affiliate_program ?? true,
-        webhookIntegrations: flags.webhook_integrations ?? true,
-        multiRegionSync: flags.multi_region_sync ?? false,
-        betaAiFeatures: flags.beta_ai_features ?? false,
-        performanceMode: flags.performance_mode ?? false,
-        loading: false,
-        error: null,
-      });
-    } catch (error) {
-      set({
-        loading: false,
-        error: error instanceof Error ? error.message : 'Failed to load flags',
-      });
-    }
-
-    return {
-      videoGeneration: true,
-      imageGeneration: true,
-      competitorAnalysis: true,
-      aiOptimization: true,
-      advancedAnalytics: true,
-      affiliateProgram: true,
-      webhookIntegrations: true,
-      multiRegionSync: false,
-      betaAiFeatures: false,
-      performanceMode: false,
-      loading: true,
+export const useFeatureFlags = create<FeatureFlagsState>((set) => {
+  // Load flags on store creation
+  featureFlagService.getAllFlags().then((flags) => {
+    set({
+      videoGeneration: flags.video_generation ?? true,
+      imageGeneration: flags.image_generation ?? true,
+      competitorAnalysis: flags.competitor_analysis ?? true,
+      aiOptimization: flags.ai_optimization ?? true,
+      advancedAnalytics: flags.advanced_analytics ?? true,
+      affiliateProgram: flags.affiliate_program ?? true,
+      webhookIntegrations: flags.webhook_integrations ?? true,
+      multiRegionSync: flags.multi_region_sync ?? false,
+      betaAiFeatures: flags.beta_ai_features ?? false,
+      performanceMode: flags.performance_mode ?? false,
+      loading: false,
       error: null,
-      refresh: async () => {
-        set({ loading: true });
-        try {
-          await featureFlagService.refresh();
-          const flags = await featureFlagService.getAllFlags();
-          set({
-            videoGeneration: flags.video_generation ?? true,
-            imageGeneration: flags.image_generation ?? true,
-            competitorAnalysis: flags.competitor_analysis ?? true,
-            aiOptimization: flags.ai_optimization ?? true,
-            advancedAnalytics: flags.advanced_analytics ?? true,
-            affiliateProgram: flags.affiliate_program ?? true,
-            webhookIntegrations: flags.webhook_integrations ?? true,
-            multiRegionSync: flags.multi_region_sync ?? false,
-            betaAiFeatures: flags.beta_ai_features ?? false,
-            performanceMode: flags.performance_mode ?? false,
-            loading: false,
-            error: null,
-          });
-        } catch (error) {
-          set({
-            loading: false,
-            error: error instanceof Error ? error.message : 'Failed to refresh flags',
-          });
-        }
-      },
-    };
-  }
-);
+    });
+  }).catch((error) => {
+    set({
+      loading: false,
+      error: error instanceof Error ? error.message : 'Failed to load flags',
+    });
+  });
+
+  return {
+    videoGeneration: true,
+    imageGeneration: true,
+    competitorAnalysis: true,
+    aiOptimization: true,
+    advancedAnalytics: true,
+    affiliateProgram: true,
+    webhookIntegrations: true,
+    multiRegionSync: false,
+    betaAiFeatures: false,
+    performanceMode: false,
+    loading: true,
+    error: null,
+    refresh: async () => {
+      set({ loading: true });
+      try {
+        await featureFlagService.refresh();
+        const flags = await featureFlagService.getAllFlags();
+        set({
+          videoGeneration: flags.video_generation ?? true,
+          imageGeneration: flags.image_generation ?? true,
+          competitorAnalysis: flags.competitor_analysis ?? true,
+          aiOptimization: flags.ai_optimization ?? true,
+          advancedAnalytics: flags.advanced_analytics ?? true,
+          affiliateProgram: flags.affiliate_program ?? true,
+          webhookIntegrations: flags.webhook_integrations ?? true,
+          multiRegionSync: flags.multi_region_sync ?? false,
+          betaAiFeatures: flags.beta_ai_features ?? false,
+          performanceMode: flags.performance_mode ?? false,
+          loading: false,
+          error: null,
+        });
+      } catch (error) {
+        set({
+          loading: false,
+          error: error instanceof Error ? error.message : 'Failed to refresh flags',
+        });
+      }
+    },
+  };
+});
