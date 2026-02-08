@@ -56,7 +56,8 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'stats' | 'team' | 'flags' | 'audit'>('stats');
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const { refresh: refreshFlags } = useFeatureFlags();
+  const flagsStore = useFeatureFlags();
+  const refreshFlags = flagsStore?.refresh || (() => Promise.resolve());
 
   const isSupabaseReady = isSupabaseConfigured();
 
