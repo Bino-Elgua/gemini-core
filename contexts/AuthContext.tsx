@@ -37,13 +37,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Subscribe to auth changes
   useEffect(() => {
-    const unsubscribe = authService.onAuthStateChange((currentUser) => {
-      setUser(currentUser);
-      setIsLoading(false);
-    });
+    let unsubscribeFn: (() => void) | undefined;
+    
+    const setupAuth = async () => {
+      unsubscribeFn = await authService.onAuthStateChange((currentUser) => {
+        setUser(currentUser);
+        setIsLoading(false);
+      });
+    };
+
+    setupAuth();
 
     return () => {
-      unsubscribe();
+      if (unsubscribeFn) {
+        unsubscribeFn();
+      }
     };
   }, []);
 

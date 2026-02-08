@@ -162,7 +162,7 @@ class AutonomousOptimizationService {
 
 interface OptimizationOpportunity {
   assetId: string;
-  type: string;
+  type: 'copy' | 'image' | 'cta' | 'timing';
   suggestion: string;
   expectedImprovement: number;
 }

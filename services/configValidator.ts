@@ -61,6 +61,7 @@ class ConfigValidator {
     this.registerSchema({
       id: 'core-config',
       name: 'Core Configuration',
+      createdAt: new Date(),
       fields: [
         {
           name: 'nodeEnv',
@@ -110,6 +111,7 @@ class ConfigValidator {
     this.registerSchema({
       id: 'supabase-config',
       name: 'Supabase Configuration',
+      createdAt: new Date(),
       fields: [
         {
           name: 'url',
@@ -138,6 +140,7 @@ class ConfigValidator {
     this.registerSchema({
       id: 'feature-flags',
       name: 'Feature Flags',
+      createdAt: new Date(),
       fields: [
         {
           name: 'enableBeta',

@@ -3,7 +3,7 @@ export interface ExportJob {
   id: string;
   portfolioId: string;
   dataTypes: string[];
-  format: 'csv' | 'json' | 'xlsx' | 'parquet';
+  format: 'csv' | 'json' | 'xlsx';
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
   createdAt: Date;
@@ -36,7 +36,7 @@ class DataExportService {
   async createExport(
     portfolioId: string,
     dataTypes: string[],
-    format: 'csv' | 'json' | 'xlsx' | 'parquet'
+    format: 'csv' | 'json' | 'xlsx'
   ): Promise<ExportJob> {
     const job: ExportJob = {
       id: `export_${Date.now()}`,

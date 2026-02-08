@@ -325,13 +325,13 @@ class DataGovernanceService {
     dataAnonymized: number;
   }> {
     // Get all data related to user
-    const userConsents = this.consents.filter(c => c.userId === userId);
+    const userConsents = Array.from(this.consents.values()).filter(c => c.userId === userId);
     
     // Purge or anonymize data
     let dataPurged = 0;
     let dataAnonymized = 0;
 
-    for (const consent of userConsents.values()) {
+    for (const consent of userConsents) {
       if (consent.granted) {
         dataAnonymized++;
       } else {

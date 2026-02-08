@@ -257,13 +257,28 @@ class AIProviderService {
     provider: AIProvider,
     options?: any
   ): Promise<string> {
-    const { GoogleGenerativeAI } = await import('@google/genai');
+    // Use fetch API instead of SDK to avoid import issues
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': provider.apiKey
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }]
+      })
+    });
 
-    const client = new GoogleGenerativeAI(provider.apiKey);
-    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'Gemini API error');
+    }
 
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return text;
   }
 
   getAvailableLLMProviders(): string[] {

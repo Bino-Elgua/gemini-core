@@ -3,8 +3,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 let supabaseInstance: SupabaseClient | null = null;
 
 export const initSupabase = (): SupabaseClient | null => {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
   if (!supabaseUrl || !supabaseKey) {
     console.warn('⚠️ Supabase not configured. Using offline mode.');
@@ -22,14 +22,14 @@ export const initSupabase = (): SupabaseClient | null => {
 };
 
 export const getSupabase = (): SupabaseClient | null => {
-  if (!supabaseInstance && import.meta.env.VITE_SUPABASE_URL) {
+  if (!supabaseInstance && (import.meta.env.VITE_SUPABASE_URL as string)) {
     return initSupabase();
   }
   return supabaseInstance;
 };
 
 export const isSupabaseConfigured = (): boolean => {
-  return !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
+  return !!(import.meta.env.VITE_SUPABASE_URL as string) && !!(import.meta.env.VITE_SUPABASE_ANON_KEY as string);
 };
 
 export const checkConnection = async (): Promise<boolean> => {

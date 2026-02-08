@@ -69,8 +69,32 @@ class ImageGenerationService {
   ): Promise<GeneratedImage> {
     console.log('🎨 Generating with DALLE-3...');
     
-    // DALLE-3 implementation
-    const imageUrl = `https://images.unsplash.com/photo-${Date.now()}?w=${width}&h=${height}`;
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined;
+    if (!apiKey) {
+      throw new Error('OpenAI API key not configured for DALLE-3');
+    }
+
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'dall-e-3',
+        prompt: request.prompt,
+        n: 1,
+        size: `${Math.min(width, 1024)}x${Math.min(height, 1024)}`
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'DALLE-3 API error');
+    }
+
+    const data = await response.json();
+    const imageUrl = data.data[0]?.url || `https://images.unsplash.com/photo-${Date.now()}?w=${width}&h=${height}`;
     
     return {
       id: `dalle3-${Date.now()}`,
@@ -91,8 +115,39 @@ class ImageGenerationService {
   ): Promise<GeneratedImage> {
     console.log('🎨 Generating with Stability AI...');
     
-    // Stability AI implementation
-    const imageUrl = `https://images.unsplash.com/photo-${Date.now()}?w=${width}&h=${height}`;
+    const apiKey = import.meta.env.VITE_STABILITY_API_KEY as string | undefined;
+    if (!apiKey) {
+      throw new Error('Stability AI API key not configured');
+    }
+
+    const response = await fetch(
+      `https://api.stability.ai/v1/generate`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          prompt: request.prompt,
+          steps: 30,
+          width: Math.min(width, 1024),
+          height: Math.min(height, 1024),
+          samples: 1,
+          guidance_scale: 7.5
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Stability API error');
+    }
+
+    const data = await response.json();
+    const imageUrl = data.artifacts?.[0]?.base64 
+      ? `data:image/png;base64,${data.artifacts[0].base64}`
+      : `https://images.unsplash.com/photo-${Date.now()}?w=${width}&h=${height}`;
     
     return {
       id: `stability-${Date.now()}`,

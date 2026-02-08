@@ -126,7 +126,7 @@ class LLMProviderService {
     }
 
     // Set defaults
-    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
     if (geminiKey && !this.configs.has('gemini')) {
       this.configs.set('gemini', {
         provider: 'gemini',
@@ -195,22 +195,37 @@ class LLMProviderService {
     options?: any
   ): Promise<LLMResponse> {
     try {
-      const { GoogleGenerativeAI } = await import('@google/genai');
       const config = this.configs.get('gemini');
 
       if (!config || !config.apiKey) {
         throw new Error('Gemini API key not configured');
       }
 
-      const client = new GoogleGenerativeAI(config.apiKey);
-      const model = client.getGenerativeModel({ model: config.model || 'gemini-2.0-flash' });
+      // Use direct Gemini API call instead of SDK
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': config.apiKey
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: prompt }]
+          }]
+        })
+      });
 
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'Gemini API error');
+      }
+
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
       return {
         text,
-        tokens: Math.ceil(text.length / 4), // Rough estimation
+        tokens: Math.ceil(text.length / 4),
         provider: 'gemini',
         cost: (Math.ceil(text.length / 4) * 0.000075),
         responseTime: 0
@@ -225,13 +240,35 @@ class LLMProviderService {
     config: LLMConfig,
     options?: any
   ): Promise<LLMResponse> {
-    // OpenAI implementation
-    console.log('📝 OpenAI generation (implementation pending)');
+    if (!config.apiKey) throw new Error('OpenAI API key required');
+    
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.model || 'gpt-4-turbo',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: config.temperature || 0.7,
+        max_tokens: config.maxTokens || 2048
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'OpenAI API error');
+    }
+
+    const data = await response.json();
+    const text = data.choices[0]?.message?.content || '';
+
     return {
-      text: `[OpenAI response to: ${prompt.substring(0, 50)}...]`,
-      tokens: 100,
+      text,
+      tokens: data.usage?.total_tokens || 0,
       provider: 'openai',
-      cost: 0.003,
+      cost: (data.usage?.total_tokens || 0) / 1000 * 0.03,
       responseTime: 0
     };
   }
@@ -241,13 +278,35 @@ class LLMProviderService {
     config: LLMConfig,
     options?: any
   ): Promise<LLMResponse> {
-    // Claude implementation
-    console.log('📝 Claude generation (implementation pending)');
+    if (!config.apiKey) throw new Error('Claude API key required');
+    
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': config.apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: config.model || 'claude-3-sonnet-20240229',
+        max_tokens: config.maxTokens || 2048,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'Claude API error');
+    }
+
+    const data = await response.json();
+    const text = data.content[0]?.text || '';
+
     return {
-      text: `[Claude response to: ${prompt.substring(0, 50)}...]`,
-      tokens: 100,
+      text,
+      tokens: data.usage?.output_tokens || 0,
       provider: 'claude',
-      cost: 0.0015,
+      cost: (data.usage?.output_tokens || 0) / 1000 * 0.0015,
       responseTime: 0
     };
   }
@@ -257,13 +316,35 @@ class LLMProviderService {
     config: LLMConfig,
     options?: any
   ): Promise<LLMResponse> {
-    // Mistral implementation
-    console.log('📝 Mistral generation (implementation pending)');
+    if (!config.apiKey) throw new Error('Mistral API key required');
+    
+    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.model || 'mistral-large-latest',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: config.temperature || 0.7,
+        max_tokens: config.maxTokens || 2048
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Mistral API error');
+    }
+
+    const data = await response.json();
+    const text = data.choices[0]?.message?.content || '';
+
     return {
-      text: `[Mistral response to: ${prompt.substring(0, 50)}...]`,
-      tokens: 100,
+      text,
+      tokens: data.usage?.total_tokens || 0,
       provider: 'mistral',
-      cost: 0.0002,
+      cost: (data.usage?.total_tokens || 0) / 1000 * 0.00015,
       responseTime: 0
     };
   }

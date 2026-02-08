@@ -171,16 +171,17 @@ class SonicService {
     return generation;
   }
 
-  private getDefaultDuration(type: SonicUseCase['type']): number {
-    const durations: Record<SonicUseCase['type'], number> = {
+  private getDefaultDuration(type: 'logo' | 'notification' | 'transition' | 'custom' | 'alert' | 'theme' | 'jingle'): number {
+    const durations: Record<string, number> = {
       logo: 3000,
       notification: 1000,
       transition: 2000,
       alert: 1500,
       theme: 5000,
-      jingle: 10000
+      jingle: 10000,
+      custom: 4000
     };
-    return durations[type as keyof Record<SonicUseCase['type'], number>] || 3000;
+    return durations[type] || 3000;
   }
 
   private async completeGeneration(generationId: string): Promise<void> {
