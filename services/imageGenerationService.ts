@@ -1,5 +1,6 @@
 import { ImageGenerationRequest } from '../types-extended';
 import { hybridStorage } from './hybridStorageService';
+import { costTrackingService } from './costTrackingService';
 
 interface GeneratedImage {
   id: string;
@@ -70,7 +71,16 @@ class ImageGenerationService {
     generations.push(image);
     await hybridStorage.set('image-generations', generations);
 
-    console.log(`✅ Image generated: ${image.id}`);
+    // Track cost
+    const cost = costTrackingService.estimateCost(provider, 'image_generation');
+    await costTrackingService.logUsage({
+      provider,
+      operationType: 'image_generation',
+      cost: cost,
+      metadata: { width, height }
+    });
+
+    console.log(`✅ Image generated: ${image.id} (${provider}) - $${cost.toFixed(4)}`);
     return image;
   }
 

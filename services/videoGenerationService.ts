@@ -1,5 +1,7 @@
 import { VideoGenerationRequest } from '../types-extended';
 import { hybridStorage } from './hybridStorageService';
+import { useStore } from '../store';
+import { costTrackingService } from './costTrackingService';
 
 interface GeneratedVideo {
   id: string;
@@ -28,7 +30,9 @@ class VideoGenerationService {
   }
 
   async generate(request: VideoGenerationRequest): Promise<GeneratedVideo> {
-    const provider = request.provider || 'bbb-fallback';
+    const { providers } = useStore.getState();
+    const activeVideo = providers.activeVideo || 'google-veo';
+    const provider = request.provider || activeVideo;
     const duration = request.duration || 5;
     const aspectRatio = request.aspectRatio || '16:9';
 
@@ -48,12 +52,29 @@ class VideoGenerationService {
         case 'kling':
           video = await this.generateWithKling(request, duration, aspectRatio);
           break;
+        case 'luma':
+          video = await this.generateWithLuma(request, duration, aspectRatio);
+          break;
+        case 'ltx-2':
+          video = await this.generateWithLTX2(request, duration, aspectRatio);
+          break;
         default:
-          video = await this.generateWithBBB(request, duration, aspectRatio);
+          video = await this.generateWithGoogleVeo(request, duration, aspectRatio);
       }
     } catch (error) {
       console.error(`Video generation failed (${provider}):`, error);
-      video = await this.generateWithBBB(request, duration, aspectRatio);
+      // Fallback to Google Veo
+      video = await this.generateWithGoogleVeo(request, duration, aspectRatio);
+    }
+
+    // Track cost
+    if (video.cost) {
+      await costTrackingService.logUsage({
+        provider,
+        operationType: 'video_generation',
+        cost: video.cost,
+        metadata: { duration, aspectRatio }
+      });
     }
 
     // Log
@@ -61,7 +82,7 @@ class VideoGenerationService {
     videos.push(video);
     await hybridStorage.set('video-generations', videos);
 
-    console.log(`✅ Video queued: ${video.id}`);
+    console.log(`✅ Video queued: ${video.id} (${provider})`);
     return video;
   }
 
@@ -137,6 +158,44 @@ class VideoGenerationService {
       duration,
       aspectRatio,
       cost: 0.05,
+      createdAt: new Date()
+    };
+  }
+
+  private async generateWithLuma(
+    request: VideoGenerationRequest,
+    duration: number,
+    aspectRatio: string
+  ): Promise<GeneratedVideo> {
+    console.log('🎬 Queuing with Luma...');
+    
+    return {
+      id: `luma-${Date.now()}`,
+      prompt: request.prompt,
+      provider: 'luma',
+      status: 'pending',
+      duration,
+      aspectRatio,
+      cost: 0.08,
+      createdAt: new Date()
+    };
+  }
+
+  private async generateWithLTX2(
+    request: VideoGenerationRequest,
+    duration: number,
+    aspectRatio: string
+  ): Promise<GeneratedVideo> {
+    console.log('🎬 Queuing with LTX-2...');
+    
+    return {
+      id: `ltx2-${Date.now()}`,
+      prompt: request.prompt,
+      provider: 'ltx-2',
+      status: 'pending',
+      duration,
+      aspectRatio,
+      cost: 0.12,
       createdAt: new Date()
     };
   }

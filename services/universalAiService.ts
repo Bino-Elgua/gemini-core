@@ -2,6 +2,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { useStore } from "../store";
 import { neuralCache } from "./neuralCache";
+import { costTrackingService } from "./costTrackingService";
 
 export interface TextGenerationParams {
   systemInstruction?: string;
@@ -162,6 +163,15 @@ export const universalAiService = {
       if (!params.bypassCache && processedResult !== "FALLBACK_TRIGGERED") {
         neuralCache.set(params.prompt, { activeLLM, sys: params.systemInstruction }, processedResult);
       }
+
+      // Track cost
+      const cost = costTrackingService.estimateCost(activeLLM, 'text_generation');
+      await costTrackingService.logUsage({
+        provider: activeLLM,
+        operationType: 'text_generation',
+        cost: cost,
+        metadata: { tokenEstimate: result.length }
+      });
 
       return processedResult;
     } catch (error: any) {

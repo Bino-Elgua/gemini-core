@@ -2,6 +2,9 @@
 import { BrandDNA, CampaignPRD, CampaignAsset, UserStory } from "../types";
 import { generateAssetFromStory, generateCampaignImage } from "./geminiService";
 import { healAsset } from "./selfHealingService";
+import { universalAiService } from "./universalAiService";
+import { imageGenerationService } from "./imageGenerationService";
+import { useStore } from "../store";
 
 export type LogCallback = (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 export type ProgressCallback = (completed: number, total: number) => void;
@@ -105,8 +108,25 @@ export class AutonomousCampaignEngine {
     this.onLog(`[${story.channel.toUpperCase()}] Synthesizing Full Post...`, 'info');
 
     try {
+      const { providers } = useStore.getState();
+      const activeLLM = providers.activeLLM || 'gemini';
+      const activeImage = providers.activeImage || 'stability-ultra';
+
       // 1. One-Shot Content Generation (Channel Aware)
-      const rawAsset = await generateAssetFromStory(this.brand, story);
+      // Use universalAiService for non-Gemini providers, otherwise use geminiService
+      let rawAsset;
+      if (activeLLM === 'gemini') {
+        rawAsset = await generateAssetFromStory(this.brand, story);
+      } else {
+        // Use universalAiService for other providers
+        const prompt = `Generate a complete campaign asset for this story:\n${JSON.stringify(story)}\n\nBrand context: ${this.brand.name}\n\nReturn valid JSON with: title, headline, content, platformPost, cta, imagePrompt (string), hashtags (array), metadata (object with platformConvention)`;
+        const responseText = await universalAiService.generateText({
+          prompt,
+          responseMimeType: 'application/json',
+          bypassCache: true
+        });
+        rawAsset = JSON.parse(responseText);
+      }
       
       // 2. Linear Audit (Strict single-pass validation)
       const { asset: finalAssetData, report } = await healAsset(
@@ -121,7 +141,19 @@ export class AutonomousCampaignEngine {
       let imageUrl = undefined;
       if (finalAssetData.imagePrompt) {
         this.onLog(`[MEDIA] Rendering Frame...`, 'info');
-        imageUrl = await generateCampaignImage(finalAssetData.imagePrompt, this.brand);
+        try {
+          const generatedImage = await imageGenerationService.generate({
+            prompt: finalAssetData.imagePrompt,
+            provider: activeImage,
+            width: 1024,
+            height: 1024
+          });
+          imageUrl = generatedImage.url;
+        } catch (imageError) {
+          this.onLog(`[MEDIA] Image generation failed, using fallback...`, 'warning');
+          // Fallback to Gemini image generation
+          imageUrl = await generateCampaignImage(finalAssetData.imagePrompt, this.brand);
+        }
       }
 
       // 4. Finalize Asset Structure
