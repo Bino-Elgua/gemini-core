@@ -1,0 +1,93 @@
+version: '3.9'
+
+services:
+  # Sacred Core Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sacred-core
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      # Add your environment variables here
+      # VITE_API_URL: http://localhost:4000
+      # VITE_SUPABASE_URL: ${SUPABASE_URL}
+      # VITE_SUPABASE_KEY: ${SUPABASE_KEY}
+    volumes:
+      - ./dist:/app/dist
+    networks:
+      - sacred-network
+    depends_on:
+      - db
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    labels:
+      - "com.example.description=Sacred Core - AI Marketing Platform"
+
+  # PostgreSQL Database (Optional - for local development)
+  db:
+    image: postgres:16-alpine
+    container_name: sacred-db
+    environment:
+      POSTGRES_DB: sacred_core
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - sacred-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Cache (Optional - for performance)
+  redis:
+    image: redis:7-alpine
+    container_name: sacred-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sacred-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Adminer - Database Management UI (Optional)
+  adminer:
+    image: adminer:latest
+    container_name: sacred-adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - sacred-network
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  sacred-network:
+    driver: bridge

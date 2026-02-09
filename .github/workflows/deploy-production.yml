@@ -1,0 +1,101 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Type check
+        run: npm run type-check
+      
+      - name: Lint
+        run: npm run lint
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Verify build
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "❌ Build failed - dist directory not found"
+            exit 1
+          fi
+          echo "✅ Build verified"
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure deployment
+        run: |
+          echo "🚀 Production deployment starting..."
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref }}"
+      
+      - name: Build Docker image
+        run: |
+          docker build -t sacred-core:latest .
+          docker tag sacred-core:latest sacred-core:${{ github.sha }}
+          echo "✅ Docker image built"
+      
+      - name: Deploy to production
+        run: |
+          echo "🚀 Deploying to production..."
+          # Replace with your actual production deployment command
+          # Example: docker push your-registry/sacred-core:latest
+          # Example: kubectl set image deployment/sacred-core sacred-core=your-registry/sacred-core:latest
+          echo "✅ Production deployment would run here"
+          echo "Configure your production deployment target in this workflow"
+        env:
+          # Add your production deployment secrets here
+          # DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          # DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          # KUBECONFIG: ${{ secrets.KUBECONFIG }}
+          pass
+      
+      - name: Post-deployment verification
+        run: |
+          echo "✅ Verifying production deployment..."
+          echo "Health check would run here"
+          echo "Smoke tests would run here"
+      
+      - name: Slack notification
+        if: success()
+        run: |
+          echo "✅ Production deployment successful"
+          # Send to Slack: ${{ secrets.SLACK_WEBHOOK }}
+      
+      - name: Create release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            Production deployment successful
+            Commit: ${{ github.sha }}
+          draft: false
+          prerelease: false

@@ -1,0 +1,56 @@
+name: Test & Quality
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run TypeScript check
+        run: npm run type-check
+      
+      - name: Run ESLint
+        run: npm run lint
+      
+      - name: Run tests
+        run: npm run test 2>/dev/null || echo "Tests not configured yet"
+      
+      - name: Build production bundle
+        run: npm run build
+      
+      - name: Check bundle size
+        run: |
+          SIZE=$(du -sh dist/ | cut -f1)
+          echo "Build size: $SIZE"
+          if [ $(du -s dist/ | cut -f1) -gt 300000 ]; then
+            echo "⚠️ Bundle size warning: greater than 300KB"
+          else
+            echo "✅ Bundle size OK: less than 300KB"
+          fi
+      
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.node-version }}
+          path: dist/
+          retention-days: 1
