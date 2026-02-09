@@ -5,18 +5,25 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "tsx watch server.ts",
+    "dev:full": "concurrently \"npm run dev\" \"npm run dev:api\"",
     "build": "vite build",
     "preview": "vite preview",
+    "start:api": "tsx server.ts",
     "test:e2e": "playwright test",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@fastify/cors": "^8.5.0",
+    "@fastify/jwt": "^7.2.4",
+    "@fastify/rate-limit": "^9.1.0",
     "@google/genai": "^1.35.0",
     "@sentry/react": "^10.38.0",
     "@sentry/tracing": "^7.120.4",
     "@supabase/supabase-js": "^2.90.0",
+    "fastify": "^4.29.1",
     "framer-motion": "^12.23.26",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.4",
@@ -32,6 +39,8 @@
     "@playwright/test": "^1.48.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^8.2.2",
+    "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
