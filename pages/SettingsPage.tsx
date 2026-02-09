@@ -138,7 +138,7 @@ const ProviderCard = ({
   );
 };
 
-const CollapsibleSection = ({ section, providers, updateProviders, setApiKey, typeLabel }: any) => {
+const CollapsibleSection = ({ section, providers, updateProviders, setApiKey, setActiveLLM, setActiveImage, setActiveVideo, typeLabel }: any) => {
   const [isOpen, setIsOpen] = useState(true);
 
   return (
@@ -173,7 +173,13 @@ const CollapsibleSection = ({ section, providers, updateProviders, setApiKey, ty
               name={item.name}
               icon={item.icon}
               isActive={(providers as any)[section.type] === item.id}
-              onActivate={() => updateProviders({ [section.type]: item.id })}
+              onActivate={() => {
+                updateProviders({ [section.type]: item.id });
+                // Also update the active provider in store
+                if (section.type === 'activeLLM') setActiveLLM(item.id);
+                else if (section.type === 'activeImage') setActiveImage(item.id);
+                else if (section.type === 'activeVideo') setActiveVideo(item.id);
+              }}
               apiKey={(providers.keys as any)[item.id]}
               onKeyChange={(val: string) => setApiKey(item.id as any, val)}
               checkFn={item.check}
@@ -187,7 +193,7 @@ const CollapsibleSection = ({ section, providers, updateProviders, setApiKey, ty
 };
 
 const SettingsPage = () => {
-  const { userTier, setTier, credits, providers, updateProviders, setApiKey, showTrendPulse, toggleTrendPulse } = useStore();
+  const { userTier, setTier, credits, providers, updateProviders, setApiKey, setActiveLLM, setActiveImage, setActiveVideo, showTrendPulse, toggleTrendPulse } = useStore();
   const [activeTab, setActiveTab] = useState<'neural' | 'billing' | 'affiliate'>('neural');
 
   const sections = [
@@ -305,7 +311,7 @@ const SettingsPage = () => {
                 </div>
 
                 {sections.map((section, idx) => (
-                  <CollapsibleSection key={idx} section={section} providers={providers} updateProviders={updateProviders} setApiKey={setApiKey} typeLabel={section.label} />
+                  <CollapsibleSection key={idx} section={section} providers={providers} updateProviders={updateProviders} setApiKey={setApiKey} setActiveLLM={setActiveLLM} setActiveImage={setActiveImage} setActiveVideo={setActiveVideo} typeLabel={section.label} />
                 ))}
                 
                 <div className="bg-brand-950/10 border border-brand-500/20 p-10 rounded-[3rem] flex flex-col md:flex-row items-center gap-10 shadow-2xl relative overflow-hidden group">

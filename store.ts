@@ -84,6 +84,9 @@ interface AppState {
   deleteAgent: (id: string) => void;
   updateProviders: (updates: Partial<ProviderConfig>) => void;
   setApiKey: (provider: keyof ProviderConfig['keys'], key: string) => void;
+  setActiveLLM: (provider: string) => void;
+  setActiveImage: (provider: string) => void;
+  setActiveVideo: (provider: string) => void;
   toggleTrendPulse: () => void;
   reset: () => void;
 }
@@ -177,6 +180,18 @@ export const useStore = create<AppState>()(
           ...state.providers,
           keys: { ...state.providers.keys, [provider]: key }
         }
+      })),
+      
+      setActiveLLM: (provider) => set((state) => ({
+        providers: { ...state.providers, activeLLM: provider }
+      })),
+      
+      setActiveImage: (provider) => set((state) => ({
+        providers: { ...state.providers, activeImage: provider }
+      })),
+      
+      setActiveVideo: (provider) => set((state) => ({
+        providers: { ...state.providers, activeVideo: provider }
       })),
       
       toggleTrendPulse: () => set((state) => ({ showTrendPulse: !state.showTrendPulse })),
