@@ -157,13 +157,14 @@ const AssetDetailsModal: React.FC<{
               </div>
               <div 
                 onClick={handleImageClick}
-                className={`aspect-square bg-black border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl relative group/media ${!asset.videoUrl && asset.imageUrl ? 'cursor-pointer hover:border-brand-500/50 transition-all' : ''}`}
+                className={`w-full bg-black border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl relative group/media ${!asset.videoUrl && asset.imageUrl ? 'cursor-pointer hover:border-brand-500/50 transition-all' : ''}`}
+                style={{ aspectRatio: asset.videoUrl ? '16/9' : '16/9' }}
               >
                 {asset.videoUrl ? (
-                  <video src={asset.videoUrl} controls autoPlay loop className="w-full h-full object-cover" />
+                  <video src={asset.videoUrl} controls autoPlay loop className="w-full h-full object-contain bg-black" />
                 ) : asset.imageUrl ? (
                   <div className="relative w-full h-full">
-                    <img src={asset.imageUrl} alt="Asset" className="w-full h-full object-cover transition-transform duration-700 group-hover/media:scale-105" />
+                    <img src={asset.imageUrl} alt="Asset" className="w-full h-full object-contain transition-transform duration-700 group-hover/media:scale-105" />
                     
                     {/* Interaction Overlays */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 opacity-0 group-hover/media:opacity-100 transition-opacity">
@@ -233,13 +234,13 @@ const AssetCard: React.FC<{
       <div onClick={() => setShowDetails(true)} className="bg-dark-surface border border-dark-border rounded-2xl overflow-hidden group hover:border-brand-500/50 transition-all cursor-pointer shadow-lg flex flex-col h-full animate-in zoom-in-95 duration-300">
         <div className="relative h-64 bg-black/50 overflow-hidden shrink-0">
           {asset.videoUrl ? (
-            <video src={asset.videoUrl} muted autoPlay loop className="w-full h-full object-cover" />
+            <video src={asset.videoUrl} muted autoPlay loop className="w-full h-full object-contain" />
           ) : asset.imageUrl ? (
             <div 
               onClick={handleAnimateClick}
-              className="relative w-full h-full cursor-pointer overflow-hidden"
+              className="relative w-full h-full cursor-pointer overflow-hidden flex items-center justify-center"
             >
-              <img src={asset.imageUrl} alt="Asset" className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700" />
+              <img src={asset.imageUrl} alt="Asset" className="max-w-full max-h-full object-contain transition-transform group-hover:scale-110 duration-700" />
               
               {/* Card Hover Action */}
               {!isAnimating && (
