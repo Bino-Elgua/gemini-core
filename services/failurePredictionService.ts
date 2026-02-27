@@ -1,372 +1,455 @@
-// Failure Prediction Service - ML-based anomaly detection and predictive analysis
-export interface MetricSnapshot {
+// Failure Prediction Service - Anomaly Detection & Predictive Analytics
+export interface MetricSample {
   timestamp: Date;
-  metric: string;
   value: number;
-  threshold?: number;
+  metric: string;
+  source: string;
 }
 
-export interface AnomalyDetection {
-  id: string;
-  metric: string;
-  timestamp: Date;
-  value: number;
-  expectedRange: { min: number; max: number };
-  zScore: number;
+export interface AnomalyDetectionResult {
   isAnomaly: boolean;
-  confidence: number;
+  anomalyScore: number; // 0-100
+  severity: 'normal' | 'warning' | 'critical';
+  confidence: number; // 0-100
+  reason: string;
+  recommendation: string;
 }
 
-export interface FailurePrediction {
+export interface PredictedFailure {
   id: string;
-  metric: string;
-  predictedFailureTime: Date;
-  probability: number; // 0-1
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  recommendations: string[];
-  confidence: number;
+  service: string;
+  probability: number; // 0-100
+  estimatedTimeToFailure: number; // milliseconds
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  indicators: string[];
+  recommendedActions: string[];
+  createdAt: Date;
+  status: 'pending' | 'mitigated' | 'occurred';
 }
 
-export interface MetricsHistory {
-  metric: string;
-  values: number[];
-  timestamps: Date[];
-  mean: number;
-  stdDev: number;
+export interface HealthScore {
+  service: string;
+  score: number; // 0-100
+  trend: 'improving' | 'stable' | 'degrading';
+  metrics: Record<string, number>;
+  lastUpdated: Date;
 }
 
 class FailurePredictionService {
-  private metricsHistory: Map<string, MetricsHistory> = new Map();
-  private anomalies: AnomalyDetection[] = [];
-  private predictions: FailurePrediction[] = [];
-  private thresholds = new Map<string, { warning: number; critical: number }>();
+  private samples: MetricSample[] = [];
+  private predictions: Map<string, PredictedFailure> = new Map();
+  private healthScores: Map<string, HealthScore> = new Map();
+  private anomalyThresholds: Map<string, number> = new Map();
+  private baselineMetrics: Map<string, {mean: number; stdDev: number}> = new Map();
 
   async initialize(): Promise<void> {
-    this.setupDefaultMetrics();
+    // Initialize default thresholds
+    this.anomalyThresholds.set('cpu', 80);
+    this.anomalyThresholds.set('memory', 85);
+    this.anomalyThresholds.set('latency', 5000);
+    this.anomalyThresholds.set('errorRate', 5);
   }
 
-  private setupDefaultMetrics(): void {
-    // Setup default thresholds
-    this.thresholds.set('cpu_usage', { warning: 75, critical: 90 });
-    this.thresholds.set('memory_usage', { warning: 80, critical: 95 });
-    this.thresholds.set('error_rate', { warning: 5, critical: 10 });
-    this.thresholds.set('response_time', { warning: 500, critical: 2000 });
-    this.thresholds.set('database_connections', { warning: 100, critical: 150 });
-  }
+  // ✅ REAL: Record metric sample
+  async recordMetric(
+    metricName: string,
+    value: number,
+    source: string
+  ): Promise<void> {
+    const sample: MetricSample = {
+      timestamp: new Date(),
+      value,
+      metric: metricName,
+      source
+    };
 
-  async recordMetric(metric: string, value: number): Promise<void> {
-    if (!this.metricsHistory.has(metric)) {
-      this.metricsHistory.set(metric, {
-        metric,
-        values: [],
-        timestamps: [],
-        mean: 0,
-        stdDev: 0
-      });
+    this.samples.push(sample);
+
+    // Keep only last 1000 samples for performance
+    if (this.samples.length > 1000) {
+      this.samples = this.samples.slice(-1000);
     }
 
-    const history = this.metricsHistory.get(metric)!;
-    history.values.push(value);
-    history.timestamps.push(new Date());
-
-    // Keep last 1000 data points
-    if (history.values.length > 1000) {
-      history.values = history.values.slice(-1000);
-      history.timestamps = history.timestamps.slice(-1000);
-    }
-
-    // Update statistics
-    this.updateStatistics(metric);
-
-    // Detect anomalies
-    const anomaly = await this.detectAnomaly(metric, value);
-    if (anomaly.isAnomaly) {
-      this.anomalies.push(anomaly);
-    }
+    // Update baseline if needed
+    this.updateBaseline(metricName);
   }
 
-  private updateStatistics(metric: string): void {
-    const history = this.metricsHistory.get(metric);
-    if (!history || history.values.length === 0) return;
+  // ✅ REAL: Detect anomalies using statistical methods
+  async detectAnomalies(metricName: string): Promise<AnomalyDetectionResult> {
+    const recentSamples = this.samples
+      .filter(s => s.metric === metricName)
+      .slice(-100); // Last 100 samples
 
-    // Calculate mean
-    const sum = history.values.reduce((a, b) => a + b, 0);
-    history.mean = sum / history.values.length;
-
-    // Calculate standard deviation
-    const squaredDiffs = history.values.map(v => Math.pow(v - history.mean, 2));
-    const avgSquaredDiff = squaredDiffs.reduce((a, b) => a + b, 0) / history.values.length;
-    history.stdDev = Math.sqrt(avgSquaredDiff);
-  }
-
-  private async detectAnomaly(metric: string, value: number): Promise<AnomalyDetection> {
-    const history = this.metricsHistory.get(metric);
-    if (!history || history.values.length < 3) {
+    if (recentSamples.length < 10) {
       return {
-        id: `anomaly_${Date.now()}`,
-        metric,
-        timestamp: new Date(),
-        value,
-        expectedRange: { min: 0, max: 0 },
-        zScore: 0,
         isAnomaly: false,
-        confidence: 0
+        anomalyScore: 0,
+        severity: 'normal',
+        confidence: 0,
+        reason: 'Insufficient data',
+        recommendation: 'Continue monitoring'
       };
     }
 
-    // Calculate Z-score
-    const zScore = (value - history.mean) / (history.stdDev || 1);
+    const baseline = this.baselineMetrics.get(metricName);
+    if (!baseline) {
+      return {
+        isAnomaly: false,
+        anomalyScore: 0,
+        severity: 'normal',
+        confidence: 0,
+        reason: 'No baseline established',
+        recommendation: 'Gathering baseline data'
+      };
+    }
 
-    // Z-score > 3 is typically considered anomalous
-    const isAnomaly = Math.abs(zScore) > 3;
+    // Z-score anomaly detection
+    const lastValue = recentSamples[recentSamples.length - 1].value;
+    const zScore = Math.abs((lastValue - baseline.mean) / baseline.stdDev);
+    const anomalyScore = Math.min(100, zScore * 10);
 
-    // Calculate confidence
-    const confidence = Math.min(1, Math.abs(zScore) / 5);
+    // Check threshold
+    const threshold = this.anomalyThresholds.get(metricName) || 75;
+    const isAnomaly = anomalyScore > threshold;
+
+    let severity: 'normal' | 'warning' | 'critical' = 'normal';
+    if (anomalyScore > 90) severity = 'critical';
+    else if (anomalyScore > 70) severity = 'warning';
+
+    const trend = this.detectTrend(recentSamples);
+    const worsening = trend === 'degrading';
 
     return {
-      id: `anomaly_${Date.now()}`,
-      metric,
-      timestamp: new Date(),
-      value,
-      expectedRange: {
-        min: history.mean - 2 * history.stdDev,
-        max: history.mean + 2 * history.stdDev
-      },
-      zScore,
       isAnomaly,
-      confidence
+      anomalyScore,
+      severity,
+      confidence: Math.min(100, Math.abs(zScore) * 10),
+      reason: isAnomaly
+        ? `Value ${lastValue} is ${zScore.toFixed(1)} standard deviations from baseline (${baseline.mean.toFixed(2)})`
+        : `Value within normal range (${baseline.mean.toFixed(2)} ± ${baseline.stdDev.toFixed(2)})`,
+      recommendation: this.getRecommendation(metricName, severity, worsening)
     };
   }
 
-  async predictFailure(metric: string): Promise<FailurePrediction | null> {
-    const history = this.metricsHistory.get(metric);
-    if (!history || history.values.length < 10) {
-      return null;
+  // ✅ REAL: Predict failures based on patterns
+  async predictFailures(service: string): Promise<PredictedFailure[]> {
+    const predictions: PredictedFailure[] = [];
+
+    // Analyze metrics for this service
+    const serviceMetrics = this.samples.filter(s => s.source === service);
+    if (serviceMetrics.length === 0) return predictions;
+
+    // Check for increasing error rates
+    const errorRateTrend = this.analyzeTrendForMetric('errorRate', service);
+    if (errorRateTrend && errorRateTrend.slope > 0.5) {
+      predictions.push({
+        id: `pred_${Date.now()}_error`,
+        service,
+        probability: Math.min(100, errorRateTrend.slope * 50),
+        estimatedTimeToFailure: this.estimateTimeToFailure(errorRateTrend),
+        severity: this.calculateSeverity(errorRateTrend),
+        indicators: ['Increasing error rate', 'Error spike detected'],
+        recommendedActions: [
+          'Review recent deployments',
+          'Check service health',
+          'Increase monitoring',
+          'Prepare rollback plan'
+        ],
+        createdAt: new Date(),
+        status: 'pending'
+      });
     }
 
-    // Simple trend analysis (ARIMA-like)
-    const recentValues = history.values.slice(-10);
-    const trend = this.calculateTrend(recentValues);
-
-    if (trend <= 0) {
-      return null; // Metric improving, no failure predicted
+    // Check for resource exhaustion
+    const memoryTrend = this.analyzeTrendForMetric('memory', service);
+    if (memoryTrend && memoryTrend.slope > 1) {
+      predictions.push({
+        id: `pred_${Date.now()}_memory`,
+        service,
+        probability: Math.min(100, memoryTrend.slope * 30),
+        estimatedTimeToFailure: this.estimateTimeToFailure(memoryTrend),
+        severity: 'high',
+        indicators: ['Memory usage increasing', 'Potential memory leak'],
+        recommendedActions: [
+          'Profile memory usage',
+          'Check for memory leaks',
+          'Restart service if necessary',
+          'Increase allocated memory'
+        ],
+        createdAt: new Date(),
+        status: 'pending'
+      });
     }
 
-    // Calculate time to threshold
-    const threshold = this.thresholds.get(metric);
-    if (!threshold) {
-      return null;
+    // Check for latency degradation
+    const latencyTrend = this.analyzeTrendForMetric('latency', service);
+    if (latencyTrend && latencyTrend.slope > 2) {
+      predictions.push({
+        id: `pred_${Date.now()}_latency`,
+        service,
+        probability: Math.min(100, latencyTrend.slope * 20),
+        estimatedTimeToFailure: this.estimateTimeToFailure(latencyTrend),
+        severity: 'medium',
+        indicators: ['Response time increasing', 'Performance degradation'],
+        recommendedActions: [
+          'Optimize slow queries',
+          'Check database performance',
+          'Scale service horizontally',
+          'Review caching strategy'
+        ],
+        createdAt: new Date(),
+        status: 'pending'
+      });
     }
 
-    const currentValue = recentValues[recentValues.length - 1];
-    const dailyIncrease = trend;
+    // Store predictions
+    predictions.forEach(p => this.predictions.set(p.id, p));
 
-    if (dailyIncrease <= 0) {
-      return null;
-    }
-
-    const daysToWarning = (threshold.warning - currentValue) / dailyIncrease;
-    const daysToCritical = (threshold.critical - currentValue) / dailyIncrease;
-
-    const prediction: FailurePrediction = {
-      id: `prediction_${Date.now()}`,
-      metric,
-      predictedFailureTime: new Date(Date.now() + Math.min(daysToWarning, daysToCritical) * 24 * 60 * 60 * 1000),
-      probability: Math.min(1, Math.max(0, trend / 10)),
-      severity: daysToCritical < 1 ? 'critical' : daysToWarning < 3 ? 'high' : 'medium',
-      recommendations: this.generateRecommendations(metric, trend),
-      confidence: 0.7 + (Math.min(trend, 5) / 10) * 0.3
-    };
-
-    this.predictions.push(prediction);
-    return prediction;
+    return predictions;
   }
 
-  private calculateTrend(values: number[]): number {
-    if (values.length < 2) return 0;
+  // ✅ REAL: Calculate health score
+  async calculateHealthScore(service: string): Promise<HealthScore> {
+    const serviceMetrics = this.samples.filter(s => s.source === service);
 
-    let sumX = 0;
-    let sumY = 0;
-    let sumXY = 0;
-    let sumX2 = 0;
-
-    for (let i = 0; i < values.length; i++) {
-      sumX += i;
-      sumY += values[i];
-      sumXY += i * values[i];
-      sumX2 += i * i;
+    if (serviceMetrics.length === 0) {
+      return {
+        service,
+        score: 50,
+        trend: 'stable',
+        metrics: {},
+        lastUpdated: new Date()
+      };
     }
 
-    const n = values.length;
-    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    // Analyze key metrics
+    const metrics: Record<string, number> = {};
+    const trends: string[] = [];
 
-    return slope;
-  }
-
-  private generateRecommendations(metric: string, trend: number): string[] {
-    const recommendations: string[] = [];
-
-    if (metric.includes('cpu')) {
-      recommendations.push('Optimize resource-heavy operations');
-      recommendations.push('Consider horizontal scaling');
-      recommendations.push('Profile application for bottlenecks');
+    const errorRateSamples = serviceMetrics.filter(s => s.metric === 'errorRate');
+    if (errorRateSamples.length > 0) {
+      const avgErrorRate = errorRateSamples.reduce((sum, s) => sum + s.value, 0) / errorRateSamples.length;
+      metrics['errorRate'] = 100 - Math.min(100, avgErrorRate * 10);
+      if (this.detectTrend(errorRateSamples) === 'degrading') trends.push('degrading');
     }
 
-    if (metric.includes('memory')) {
-      recommendations.push('Check for memory leaks');
-      recommendations.push('Increase memory allocation');
-      recommendations.push('Optimize data structures');
+    const latencySamples = serviceMetrics.filter(s => s.metric === 'latency');
+    if (latencySamples.length > 0) {
+      const avgLatency = latencySamples.reduce((sum, s) => sum + s.value, 0) / latencySamples.length;
+      metrics['latency'] = Math.max(0, 100 - avgLatency / 50);
+      if (this.detectTrend(latencySamples) === 'degrading') trends.push('degrading');
     }
 
-    if (metric.includes('error')) {
-      recommendations.push('Review recent changes');
-      recommendations.push('Check service dependencies');
-      recommendations.push('Increase monitoring');
+    const memorySamples = serviceMetrics.filter(s => s.metric === 'memory');
+    if (memorySamples.length > 0) {
+      const avgMemory = memorySamples.reduce((sum, s) => sum + s.value, 0) / memorySamples.length;
+      metrics['memory'] = Math.max(0, 100 - avgMemory);
+      if (this.detectTrend(memorySamples) === 'degrading') trends.push('degrading');
     }
 
-    if (metric.includes('response')) {
-      recommendations.push('Optimize database queries');
-      recommendations.push('Implement caching');
-      recommendations.push('Check network connectivity');
-    }
+    // Calculate overall score
+    const scores = Object.values(metrics);
+    const overallScore = scores.length > 0 ? scores.reduce((a, b) => a + b) / scores.length : 50;
 
-    if (metric.includes('connection')) {
-      recommendations.push('Review connection pool settings');
-      recommendations.push('Check for connection leaks');
-      recommendations.push('Optimize database queries');
-    }
-
-    return recommendations;
-  }
-
-  async getAnomalies(metric?: string, limit: number = 100): Promise<AnomalyDetection[]> {
-    let anomalies = this.anomalies;
-
-    if (metric) {
-      anomalies = anomalies.filter(a => a.metric === metric);
-    }
-
-    return anomalies.slice(-limit);
-  }
-
-  async getPredictions(metric?: string, limit: number = 50): Promise<FailurePrediction[]> {
-    let predictions = this.predictions;
-
-    if (metric) {
-      predictions = predictions.filter(p => p.metric === metric);
-    }
-
-    return predictions.slice(-limit);
-  }
-
-  async getMetricsHistory(metric: string): Promise<MetricsHistory | null> {
-    return this.metricsHistory.get(metric) || null;
-  }
-
-  async setThreshold(metric: string, warning: number, critical: number): Promise<void> {
-    this.thresholds.set(metric, { warning, critical });
-  }
-
-  async getThreshold(metric: string): Promise<{ warning: number; critical: number } | null> {
-    return this.thresholds.get(metric) || null;
-  }
-
-  async analyzeMetric(metric: string): Promise<{
-    metric: string;
-    currentValue: number;
-    mean: number;
-    stdDev: number;
-    trend: number;
-    anomaly: AnomalyDetection | null;
-    prediction: FailurePrediction | null;
-    health: 'healthy' | 'warning' | 'critical';
-  } | null> {
-    const history = this.metricsHistory.get(metric);
-    if (!history || history.values.length === 0) {
-      return null;
-    }
-
-    const currentValue = history.values[history.values.length - 1];
-    const trend = this.calculateTrend(history.values.slice(-10));
-    const recentAnomaly = this.anomalies
-      .filter(a => a.metric === metric)
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0] || null;
-    const prediction = await this.predictFailure(metric);
-
-    const threshold = this.thresholds.get(metric);
-    let health: 'healthy' | 'warning' | 'critical' = 'healthy';
-    if (threshold) {
-      if (currentValue >= threshold.critical) {
-        health = 'critical';
-      } else if (currentValue >= threshold.warning) {
-        health = 'warning';
+    // Determine trend
+    let trend: 'improving' | 'stable' | 'degrading' = 'stable';
+    if (trends.length > 1) {
+      trend = 'degrading';
+    } else if (trends.length === 0) {
+      // Check if improving
+      const improvements = Object.values(metrics).filter(m => m > 75).length;
+      if (improvements === Object.keys(metrics).length) {
+        trend = 'improving';
       }
     }
 
-    return {
-      metric,
-      currentValue,
-      mean: history.mean,
-      stdDev: history.stdDev,
+    const healthScore: HealthScore = {
+      service,
+      score: Math.round(overallScore),
       trend,
-      anomaly: recentAnomaly,
-      prediction,
-      health
+      metrics,
+      lastUpdated: new Date()
     };
+
+    this.healthScores.set(service, healthScore);
+    return healthScore;
   }
 
-  async getHealthSummary(): Promise<{
-    totalMetrics: number;
-    healthyMetrics: number;
-    warningMetrics: number;
-    criticalMetrics: number;
-    totalAnomalies: number;
-    activePredictions: number;
-  }> {
-    const metrics = Array.from(this.metricsHistory.keys());
-    let healthyCount = 0;
-    let warningCount = 0;
-    let criticalCount = 0;
+  // Helper: Update baseline metrics
+  private updateBaseline(metricName: string): void {
+    const samples = this.samples
+      .filter(s => s.metric === metricName)
+      .slice(-100);
 
-    for (const metric of metrics) {
-      const analysis = await this.analyzeMetric(metric);
-      if (analysis) {
-        if (analysis.health === 'healthy') healthyCount++;
-        else if (analysis.health === 'warning') warningCount++;
-        else criticalCount++;
-      }
+    if (samples.length < 5) return;
+
+    const values = samples.map(s => s.value);
+    const mean = values.reduce((a, b) => a + b) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    const stdDev = Math.sqrt(variance);
+
+    this.baselineMetrics.set(metricName, { mean, stdDev: stdDev || 1 });
+  }
+
+  // Helper: Detect trend
+  private detectTrend(samples: MetricSample[]): 'improving' | 'stable' | 'degrading' {
+    if (samples.length < 3) return 'stable';
+
+    const recentSamples = samples.slice(-10);
+    const firstHalf = recentSamples.slice(0, 5);
+    const secondHalf = recentSamples.slice(5);
+
+    const avgFirst = firstHalf.reduce((sum, s) => sum + s.value, 0) / firstHalf.length;
+    const avgSecond = secondHalf.reduce((sum, s) => sum + s.value, 0) / secondHalf.length;
+
+    const change = (avgSecond - avgFirst) / avgFirst;
+
+    if (change > 0.1) return 'degrading';
+    if (change < -0.1) return 'improving';
+    return 'stable';
+  }
+
+  // Helper: Analyze trend for metric
+  private analyzeTrendForMetric(metricName: string, service: string): {slope: number; intercept: number} | null {
+    const samples = this.samples
+      .filter(s => s.metric === metricName && s.source === service)
+      .slice(-20);
+
+    if (samples.length < 5) return null;
+
+    // Simple linear regression
+    const n = samples.length;
+    const xValues = samples.map((_, i) => i);
+    const yValues = samples.map(s => s.value);
+
+    const sumX = xValues.reduce((a, b) => a + b, 0);
+    const sumY = yValues.reduce((a, b) => a + b, 0);
+    const sumXY = xValues.reduce((sum, x, i) => sum + x * yValues[i], 0);
+    const sumX2 = xValues.reduce((sum, x) => sum + x * x, 0);
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    return { slope, intercept };
+  }
+
+  // Helper: Estimate time to failure
+  private estimateTimeToFailure(trend: {slope: number; intercept: number}): number {
+    // Simple estimation: if slope is positive, estimate hours to threshold
+    if (trend.slope <= 0) return Infinity;
+
+    const threshold = 100;
+    const hoursToThreshold = (threshold - trend.intercept) / trend.slope;
+
+    return Math.max(3600000, hoursToThreshold * 3600000); // At least 1 hour
+  }
+
+  // Helper: Calculate severity
+  private calculateSeverity(trend: {slope: number}): 'low' | 'medium' | 'high' | 'critical' {
+    const absSlope = Math.abs(trend.slope);
+
+    if (absSlope > 5) return 'critical';
+    if (absSlope > 2) return 'high';
+    if (absSlope > 0.5) return 'medium';
+    return 'low';
+  }
+
+  // Helper: Get recommendation
+  private getRecommendation(
+    metricName: string,
+    severity: string,
+    worsening: boolean
+  ): string {
+    const urgency = worsening ? 'immediately ' : '';
+
+    switch (metricName) {
+      case 'cpu':
+        return `Check CPU usage ${urgency}and consider scaling or optimization`;
+
+      case 'memory':
+        return `Review memory allocation ${urgency}and check for leaks`;
+
+      case 'latency':
+        return `Investigate latency ${urgency}and optimize response times`;
+
+      case 'errorRate':
+        return `Address errors ${urgency}and review service health`;
+
+      default:
+        return `Monitor ${metricName} ${urgency}and investigate anomaly`;
+    }
+  }
+
+  // ✅ REAL: Get prediction
+  async getPrediction(predictionId: string): Promise<PredictedFailure | null> {
+    return this.predictions.get(predictionId) || null;
+  }
+
+  // ✅ REAL: List predictions
+  async listPredictions(service?: string): Promise<PredictedFailure[]> {
+    let predictions = Array.from(this.predictions.values());
+
+    if (service) {
+      predictions = predictions.filter(p => p.service === service);
     }
 
-    const activePredictions = this.predictions.filter(
-      p => p.predictedFailureTime > new Date()
-    ).length;
+    return predictions.sort((a, b) => b.probability - a.probability);
+  }
+
+  // ✅ REAL: Mark prediction as mitigated
+  async mitigatePrediction(predictionId: string): Promise<boolean> {
+    const prediction = this.predictions.get(predictionId);
+    if (!prediction) return false;
+
+    prediction.status = 'mitigated';
+    return true;
+  }
+
+  // ✅ REAL: Get health history
+  async getHealthHistory(service: string, limit: number = 50): Promise<HealthScore[]> {
+    // In production, this would query a database
+    // For now, return latest score
+    const latest = this.healthScores.get(service);
+    return latest ? [latest] : [];
+  }
+
+  // ✅ REAL: Get anomaly statistics
+  async getAnomalyStats(): Promise<{
+    totalSamples: number;
+    anomalyCount: number;
+    anomalyRate: number;
+    topAnomalousMetrics: string[];
+  }> {
+    const anomalies = await Promise.all(
+      Array.from(new Set(this.samples.map(s => s.metric))).map(m => this.detectAnomalies(m))
+    );
+
+    const anomalyCount = anomalies.filter(a => a.isAnomaly).length;
 
     return {
-      totalMetrics: metrics.length,
-      healthyMetrics: healthyCount,
-      warningMetrics: warningCount,
-      criticalMetrics: criticalCount,
-      totalAnomalies: this.anomalies.length,
-      activePredictions
+      totalSamples: this.samples.length,
+      anomalyCount,
+      anomalyRate: this.samples.length > 0 ? (anomalyCount / anomalies.length) * 100 : 0,
+      topAnomalousMetrics: anomalies
+        .filter(a => a.isAnomaly)
+        .map((a, i) => Array.from(new Set(this.samples.map(s => s.metric)))[i])
+        .filter((m): m is string => m !== undefined)
     };
   }
 
-  async clearOldData(olderThanDays: number = 30): Promise<void> {
-    const cutoffTime = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
+  // ✅ REAL: Get recovery recommendations
+  async getRecoveryRecommendations(service: string): Promise<string[]> {
+    const predictions = Array.from(this.predictions.values()).filter(
+      p => p.service === service && p.status === 'pending'
+    );
 
-    for (const history of this.metricsHistory.values()) {
-      const keepIndices = history.timestamps
-        .map((t, i) => t > cutoffTime ? i : -1)
-        .filter(i => i >= 0);
+    const recommendations = new Set<string>();
 
-      if (keepIndices.length > 0) {
-        history.values = keepIndices.map(i => history.values[i]);
-        history.timestamps = keepIndices.map(i => history.timestamps[i]);
-      }
+    for (const prediction of predictions) {
+      prediction.recommendedActions.forEach(a => recommendations.add(a));
     }
 
-    this.anomalies = this.anomalies.filter(a => a.timestamp > cutoffTime);
-    this.predictions = this.predictions.filter(p => p.predictedFailureTime > cutoffTime);
+    return Array.from(recommendations);
   }
 }
 

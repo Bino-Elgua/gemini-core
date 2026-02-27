@@ -218,6 +218,7 @@ export const universalAiService = {
     });
     const data = await response.json();
     if (data.error) throw new AiServiceError(data.error.message, data.error.code);
+    if (!data.choices || !data.choices[0]) throw new AiServiceError("Invalid OpenAI response: no choices returned", "INVALID_RESPONSE");
     return data.choices[0]?.message?.content || '';
   },
 
@@ -238,6 +239,7 @@ export const universalAiService = {
     });
     const data = await response.json();
     if (data.error) throw new AiServiceError(data.error.message || "Provider Error", data.error.code);
+    if (!data.choices || !data.choices[0]) throw new AiServiceError("Invalid provider response: no choices returned", "INVALID_RESPONSE");
     return data.choices[0]?.message?.content || '';
   },
 
