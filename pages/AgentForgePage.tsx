@@ -43,12 +43,14 @@ import {
   Wand2
 } from 'lucide-react';
 import { BrandSelector } from '../components/BrandSelector';
+import { sonicService } from '../services/sonicService';
 
 const AgentForgePage = () => {
   const { agents, addAgent, updateAgent, deleteAgent, brands, currentBrand, setBrand } = useStore();
   const [selectedAgentId, setSelectedAgentId] = useState<string>(agents[0]?.id || '');
-  const [activeTab, setActiveTab] = useState<'config' | 'knowledge' | 'guardrails' | 'tuning' | 'test'>('config');
+  const [activeTab, setActiveTab] = useState<'config' | 'knowledge' | 'guardrails' | 'tuning' | 'test' | 'sonic'>('config');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [headerScroll, setHeaderScroll] = useState(0);
 
   // Form State
   const [formData, setFormData] = useState<Partial<Agent>>({});
@@ -61,6 +63,14 @@ const AgentForgePage = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [simulationMetrics, setSimulationMetrics] = useState({ latency: 0, tokens: 0, fromCache: false });
   const scrollRef = useRef<HTMLDivElement>(null);
+  const headerScrollRef = useRef<HTMLDivElement>(null);
+
+  // Sonic Audio State
+  const [sonicName, setSonicName] = useState(`${formData.name || 'Agent'} Voice`);
+  const [sonicMood, setSonicMood] = useState<'energetic' | 'calm' | 'professional' | 'playful' | 'luxury'>('professional');
+  const [sonicTempo, setSonicTempo] = useState(120);
+  const [sonicFormat, setSonicFormat] = useState<'mp3' | 'wav' | 'ogg' | 'aac'>('mp3');
+  const [isGeneratingSonic, setIsGeneratingSonic] = useState(false);
 
   const updateField = (field: keyof Agent, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -221,10 +231,29 @@ const AgentForgePage = () => {
                  <button className="px-10 py-3.5 bg-brand-600 hover:bg-brand-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-2xl shadow-brand-500/20 transition-all active:scale-95">IGNITE DEPLOYMENT</button>
               </div>
            </div>
-           <div className={`flex border-b border-dark-border bg-black/40 px-10 shrink-0 transition-all ${!isSidebarOpen ? 'pl-16' : ''}`}>
-              {[ { id: 'config', label: 'Instruction Matrix', icon: Settings }, { id: 'knowledge', label: 'Neural Base', icon: BookOpen }, { id: 'guardrails', label: 'Safety Protocols', icon: ShieldCheck }, { id: 'tuning', label: 'Inference Tuning', icon: Sliders }, { id: 'test', label: 'Simulation Grid', icon: Terminal } ].map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-10 py-5 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-3 border-b-2 transition-all ${activeTab === tab.id ? 'border-brand-500 text-brand-500 bg-brand-500/5' : 'border-transparent text-zinc-600 hover:text-zinc-300'}`}><tab.icon className="w-4 h-4" /> {tab.label}</button>
-              ))}
+           <div className={`border-b border-dark-border bg-black/40 shrink-0 transition-all ${!isSidebarOpen ? 'pl-16' : ''}`}>
+              <div className="relative flex items-center px-10">
+                 {headerScroll > 0 && (
+                    <button onClick={() => headerScrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' })} className="absolute left-0 z-10 p-3 bg-gradient-to-r from-black/60 to-transparent hover:from-black/80">
+                       <ChevronLeft className="w-4 h-4 text-brand-500" />
+                    </button>
+                 )}
+                 <div ref={headerScrollRef} onScroll={(e) => setHeaderScroll(e.currentTarget.scrollLeft)} className="flex gap-2 overflow-x-auto scrollbar-hide flex-1">
+                    {[ 
+                       { id: 'config', label: 'Instruction Matrix', icon: Settings }, 
+                       { id: 'knowledge', label: 'Neural Base', icon: BookOpen }, 
+                       { id: 'guardrails', label: 'Safety Protocols', icon: ShieldCheck }, 
+                       { id: 'tuning', label: 'Inference Tuning', icon: Sliders },
+                       { id: 'sonic', label: 'Sonic Audio (Lyria3)', icon: Mic },
+                       { id: 'test', label: 'Simulation Grid', icon: Terminal } 
+                    ].map(tab => (
+                       <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${activeTab === tab.id ? 'border-brand-500 text-brand-500 bg-brand-500/5' : 'border-transparent text-zinc-600 hover:text-zinc-300'}`}><tab.icon className="w-4 h-4" /> {tab.label}</button>
+                    ))}
+                 </div>
+                 <button onClick={() => headerScrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' })} className="absolute right-0 z-10 p-3 bg-gradient-to-l from-black/60 to-transparent hover:from-black/80">
+                    <ChevronRight className="w-4 h-4 text-brand-500" />
+                 </button>
+              </div>
            </div>
            <div className="flex-1 overflow-y-auto p-12 bg-dark-bg/30 custom-scrollbar">
               {activeTab === 'config' && (
@@ -298,12 +327,39 @@ const AgentForgePage = () => {
                     </div>
                     <form onSubmit={handleSendMessage} className="p-10 border-t border-zinc-800 bg-dark-surface/50 shadow-[0_-10px_30px_rgba(0,0,0,0.3)]"><div className="relative max-w-4xl mx-auto group"><div className="absolute inset-0 bg-brand-500/5 blur-xl rounded-full opacity-0 group-focus-within:opacity-100 transition-opacity" /><input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder={`Synthesize query for ${formData.name || 'Operative'}...`} className="w-full bg-black/60 border border-zinc-800 rounded-3xl py-6 pl-10 pr-24 text-white font-bold text-lg focus:ring-2 focus:ring-brand-500 outline-none transition-all shadow-inner placeholder-zinc-800 relative z-10" /><button type="submit" disabled={!chatInput.trim() || isTyping} className="absolute right-3 top-3 bottom-3 px-8 bg-brand-600 hover:bg-brand-500 disabled:opacity-30 text-white rounded-2xl shadow-2xl transition-all active:scale-90 flex items-center justify-center z-20 group/btn"><Send className="w-6 h-6 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform" /></button></div><p className="text-center text-[10px] text-zinc-700 font-black uppercase tracking-widest mt-6">Anti-Spam Filter Active • Serving from Neural Cache where possible</p></form>
                  </div>
-              )}
-           </div>
-        </div>
-      )}
-    </div>
-  );
-};
+                 )}
+                 {activeTab === 'sonic' && (
+                 <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-700">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                       <div className="space-y-8">
+                          <div><label className="block text-[10px] font-black text-zinc-600 uppercase mb-3 tracking-[0.2em] pl-1">Voice Identity (Lyria3)</label><input type="text" value={sonicName} onChange={(e) => setSonicName(e.target.value)} className="w-full bg-black/60 border border-zinc-800 rounded-2xl py-4.5 px-6 text-white font-bold focus:ring-1 focus:ring-brand-500 outline-none transition-all shadow-inner" placeholder="Agent voice name" /></div>
+                          <div><label className="block text-[10px] font-black text-zinc-600 uppercase mb-3 tracking-[0.2em] pl-1">Voice Mood</label><select value={sonicMood} onChange={(e) => setSonicMood(e.target.value as any)} className="w-full bg-black/60 border border-zinc-800 rounded-2xl py-4.5 px-6 text-white font-bold focus:ring-1 focus:ring-brand-500 outline-none transition-all shadow-inner"><option value="energetic">🔥 Energetic</option><option value="calm">🧘 Calm</option><option value="professional">💼 Professional</option><option value="playful">🎭 Playful</option><option value="luxury">✨ Luxury</option></select></div>
+                          <div><label className="block text-[10px] font-black text-zinc-600 uppercase mb-3 tracking-[0.2em] pl-1">Tempo (BPM)</label><div className="flex items-center gap-4"><input type="range" min="60" max="180" value={sonicTempo} onChange={(e) => setSonicTempo(Number(e.target.value))} className="flex-1" /><span className="text-lg font-black text-brand-400 text-center min-w-12">{sonicTempo}</span></div></div>
+                          <div><label className="block text-[10px] font-black text-zinc-600 uppercase mb-3 tracking-[0.2em] pl-1">Output Format</label><select value={sonicFormat} onChange={(e) => setSonicFormat(e.target.value as any)} className="w-full bg-black/60 border border-zinc-800 rounded-2xl py-4.5 px-6 text-white font-bold focus:ring-1 focus:ring-brand-500 outline-none transition-all shadow-inner"><option value="mp3">MP3 (Compressed)</option><option value="wav">WAV (Lossless)</option><option value="ogg">OGG (Streaming)</option><option value="aac">AAC (Apple)</option></select></div>
+                       </div>
+                       <div className="bg-brand-900/10 border border-brand-500/20 p-10 rounded-[2.5rem] flex flex-col justify-center relative overflow-hidden group shadow-2xl">
+                          <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity"><Mic className="w-32 h-32 text-brand-500" /></div>
+                          <h3 className="text-xs font-black text-brand-400 uppercase tracking-[0.3em] mb-3">Lyria3 Voice Gen</h3>
+                          <p className="text-sm text-zinc-400 leading-relaxed font-medium mb-6">Google's advanced text-to-speech with emotional intelligence and natural prosody. Perfect for brand voice consistency.</p>
+                          <button onClick={async () => { setIsGeneratingSonic(true); try { const result = await sonicService.generateVoiceProfile({ id: `voice-${selectedAgentId}`, name: sonicName, provider: 'google', language: 'en', gender: 'neutral', accent: 'neutral', style: sonicMood }); console.log('Voice generated:', result); } finally { setIsGeneratingSonic(false); } }} disabled={isGeneratingSonic} className="w-fit px-6 py-2.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-xl transition-all flex items-center gap-2"><Mic className="w-3 h-3" /> {isGeneratingSonic ? 'SYNTHESIZING...' : 'GENERATE VOICE'}</button>
+                       </div>
+                    </div>
+                    <div className="bg-black/40 border border-zinc-800 p-10 rounded-[2.5rem] space-y-6">
+                       <h3 className="text-lg font-black text-white uppercase tracking-[0.2em]">Voice Profile Configuration</h3>
+                       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                          <div className="bg-black/60 border border-zinc-800/50 p-6 rounded-2xl text-center"><div className="text-2xl font-black text-brand-500 mb-2">{sonicMood === 'energetic' ? '⚡' : sonicMood === 'calm' ? '🧘' : sonicMood === 'professional' ? '💼' : sonicMood === 'playful' ? '🎭' : '✨'}</div><div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{sonicMood}</div></div>
+                          <div className="bg-black/60 border border-zinc-800/50 p-6 rounded-2xl text-center"><div className="text-2xl font-black text-brand-500 mb-2">🎵</div><div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{sonicTempo} BPM</div></div>
+                          <div className="bg-black/60 border border-zinc-800/50 p-6 rounded-2xl text-center"><div className="text-2xl font-black text-brand-500 mb-2">🔊</div><div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{sonicFormat}</div></div>
+                          <div className="bg-black/60 border border-zinc-800/50 p-6 rounded-2xl text-center"><div className="text-2xl font-black text-brand-500 mb-2">🤖</div><div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Agent Voice</div></div>
+                       </div>
+                    </div>
+                 </div>
+                 )}
+                 </div>
+                 </div>
+                 )}
+                 </div>
+                 );
+                 };
 
-export default AgentForgePage;
+                 export default AgentForgePage;

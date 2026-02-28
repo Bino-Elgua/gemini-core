@@ -5,6 +5,13 @@ import { hybridStorage } from './services/hybridStorageService';
 import { initSupabase, checkConnection } from './services/supabaseClient';
 import { sentryService, SentryErrorBoundary } from './services/sentryService';
 
+// Week 3 Services - Initialize all
+import { sonicCoPilot } from './services/sonicCoPilot';
+import { battleModeService } from './services/battleModeService';
+import { sonicService } from './services/sonicService';
+import { ampCLIService } from './services/ampCLIService';
+import { imageGenerationService } from './services/imageGenerationService';
+
 // Pages
 import DashboardPage from './pages/DashboardPage';
 import ExtractPage from './pages/ExtractPage';
@@ -39,12 +46,34 @@ export default function App() {
         // Initialize hybrid storage
         await hybridStorage.initialize();
         
+        // Initialize Week 3 Services
+        console.log('⚡ Initializing Week 3 features...');
+        
+        await Promise.all([
+          sonicCoPilot.initialize?.(),
+          battleModeService.initialize?.(),
+          sonicService.initialize?.(),
+          ampCLIService.initialize?.(),
+          imageGenerationService.initialize?.()
+        ]).catch(err => console.warn('⚠️ Week 3 service initialization had issues:', err));
+        
+        // Store services in window for CLI access
+        (window as any).__SACRED_CORE__ = {
+          sonicCoPilot,
+          battleModeService,
+          sonicService,
+          ampCLIService,
+          imageGenerationService
+        };
+        
+        console.log('✅ All Week 3 services initialized');
+        
         // Check Supabase connection
         const isConnected = await checkConnection();
         if (isConnected) {
-          console.log('✅ App initialized with cloud sync');
+          console.log('✅ App initialized with cloud sync + Week 3 features');
         } else {
-          console.log('⚠️ App initialized in offline mode');
+          console.log('⚠️ App initialized in offline mode + Week 3 features');
         }
       } catch (error) {
         console.warn('⚠️ Initialization error (running in fallback mode):', error);

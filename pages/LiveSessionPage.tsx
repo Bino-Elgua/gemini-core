@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { SessionUser, ChatMessage, ActivityLogItem } from '../types';
-import { collabService } from '../services/collaborationService';
+import { collaborationService } from '../services/collaborationService';
 import { 
   Users, 
   MessageSquare, 
@@ -35,10 +35,10 @@ const LiveSessionPage = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setActiveUsers(collabService.getInitialUsers());
+    setActiveUsers(collaborationService.getInitialUsers?.() || []);
     if (currentBrand) setMission(currentBrand.mission);
 
-    const unsubscribe = collabService.subscribe((type, data) => {
+    const unsubscribe = collaborationService.subscribe((type, data) => {
       if (type === 'chat') {
         setMessages(prev => [...prev, data]);
       } else if (type === 'activity') {
@@ -64,7 +64,7 @@ const LiveSessionPage = () => {
     
     // Optimistic UI
     const myUser = activeUsers[0]; // Assuming index 0 is current user for demo
-    collabService.sendMessage(inputMessage, myUser);
+    collaborationService.sendMessage?.(inputMessage);
     setInputMessage('');
   };
 

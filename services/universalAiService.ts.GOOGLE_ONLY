@@ -1,0 +1,162 @@
+/**
+ * Universal AI Service - GOOGLE GEMINI ONLY
+ * All LLM tasks route through Google Gemini (AI Studio or Vertex AI)
+ * No other providers. Hard-coded fallback to Gemini models only.
+ */
+
+import { GoogleGenAI } from "@google/genai";
+
+export interface TextGenerationParams {
+  systemInstruction?: string;
+  prompt: string;
+  responseMimeType?: 'text/plain' | 'application/json';
+  responseSchema?: any;
+  featureId?: string;
+  bypassCache?: boolean;
+  model?: 'gemini-2.0-flash' | 'gemini-1.5-pro'; // Gemini models only
+  temperature?: number;
+  maxTokens?: number;
+}
+
+class UniversalAiService {
+  private client: GoogleGenAI;
+  private cache: Map<string, { response: string; timestamp: number }> = new Map();
+  private cacheMaxAge = 3600 * 1000; // 1 hour
+
+  constructor() {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('VITE_GEMINI_API_KEY not configured');
+    }
+    this.client = new GoogleGenAI({ apiKey });
+  }
+
+  async generateText(params: TextGenerationParams): Promise<string> {
+    const cacheKey = params.bypassCache ? null : this.getCacheKey(params);
+
+    // Check cache
+    if (cacheKey) {
+      const cached = this.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.cacheMaxAge) {
+        console.log(`✅ Cache hit for ${params.featureId || 'text generation'}`);
+        return cached.response;
+      }
+    }
+
+    // Call Gemini (ONLY provider)
+    const response = await this.callGemini(params);
+
+    // Cache result
+    if (cacheKey) {
+      this.cache.set(cacheKey, { response, timestamp: Date.now() });
+    }
+
+    return response;
+  }
+
+  private async callGemini(params: TextGenerationParams): Promise<string> {
+    const model = params.model || 'gemini-2.0-flash';
+    
+    try {
+      console.log(`🔵 Calling Gemini (${model})...`);
+
+      const response = await this.client.models.generateContent({
+        model: `models/${model}`,
+        contents: [
+          {
+            parts: [{ text: params.prompt }],
+            role: 'user'
+          }
+        ],
+        generationConfig: {
+          temperature: params.temperature ?? 0.7,
+          maxOutputTokens: params.maxTokens ?? 4096,
+          responseMimeType: params.responseMimeType || 'text/plain',
+          responseSchema: params.responseSchema
+        },
+        systemInstruction: params.systemInstruction
+      });
+
+      const text = response.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      if (!text) {
+        throw new Error('Empty response from Gemini');
+      }
+
+      // Track cost
+      const usage = response.response.usageMetadata;
+      await this.trackCost({
+        provider: 'google-gemini',
+        model,
+        inputTokens: usage?.promptTokenCount || 0,
+        outputTokens: usage?.candidatesTokenCount || 0,
+        featureId: params.featureId
+      });
+
+      return text;
+    } catch (error) {
+      console.error('❌ Gemini API error:', error);
+      throw new Error(`Gemini generation failed: ${(error as Error).message}`);
+    }
+  }
+
+  private getCacheKey(params: TextGenerationParams): string | null {
+    if (!params.prompt) return null;
+    return `gemini-${Buffer.from(params.prompt).toString('base64').substring(0, 50)}`;
+  }
+
+  private async trackCost(data: {
+    provider: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    featureId?: string;
+  }): Promise<void> {
+    // Import here to avoid circular dependency
+    const { creditsService } = await import('./creditsService');
+
+    // Gemini pricing (as of 2024)
+    const gemini2Pricing = {
+      input: 0.075 / 1_000_000, // $0.075 per 1M input tokens
+      output: 0.3 / 1_000_000   // $0.3 per 1M output tokens
+    };
+
+    const gemini15Pricing = {
+      input: 0.075 / 1_000_000,
+      output: 0.3 / 1_000_000
+    };
+
+    const pricing = data.model === 'gemini-1.5-pro' ? gemini15Pricing : gemini2Pricing;
+    const cost = (data.inputTokens * pricing.input) + (data.outputTokens * pricing.output);
+
+    if (creditsService) {
+      await creditsService.logCost({
+        provider: data.provider,
+        model: data.model,
+        operation: data.featureId || 'text-generation',
+        cost,
+        metadata: {
+          inputTokens: data.inputTokens,
+          outputTokens: data.outputTokens
+        }
+      });
+    }
+
+    console.log(`💰 Cost: $${cost.toFixed(6)} (${data.inputTokens} in, ${data.outputTokens} out)`);
+  }
+
+  // For debugging/testing
+  async healthCheck(): Promise<boolean> {
+    try {
+      const response = await this.generateText({
+        prompt: 'Say "OK" only.',
+        featureId: 'health-check'
+      });
+      return response.toLowerCase().includes('ok');
+    } catch {
+      return false;
+    }
+  }
+}
+
+export const universalAiService = new UniversalAiService();

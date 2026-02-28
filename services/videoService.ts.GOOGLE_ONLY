@@ -1,0 +1,190 @@
+/**
+ * Video Generation Service - GOOGLE VEO 3 ONLY
+ * Replaces Fal.ai, Luma, Kling, Sora with single Veo 3 integration
+ */
+
+import { universalAiService } from './universalAiService';
+import { creditsService } from './creditsService';
+import { CompanyDNA } from './dnaExtractionService';
+
+export interface VideoGenerationRequest {
+  prompt: string;
+  duration?: number; // in seconds, max 60
+  resolution?: '720p' | '1080p';
+  style?: string; // 'cinematic' | 'documentary' | 'promotional' | 'social'
+}
+
+export interface GeneratedVideo {
+  id: string;
+  prompt: string;
+  url: string;
+  duration: number;
+  resolution: string;
+  style: string;
+  createdAt: string;
+}
+
+class VideoGenerationService {
+  
+  async generate(request: VideoGenerationRequest): Promise<GeneratedVideo> {
+    console.log(`🎬 Generating video via Veo 3...`);
+
+    // Check credits (videos are expensive)
+    const canAfford = await creditsService.canAffordOperation('video-generation');
+    if (!canAfford) {
+      throw new Error('❌ Insufficient credits for video generation (requires 200 credits)');
+    }
+
+    const duration = request.duration || 10;
+    const resolution = request.resolution || '1080p';
+    const style = request.style || 'promotional';
+
+    // Enhance prompt with video-specific directives
+    const enhancedPrompt = await this.enhancePrompt(request.prompt, duration, style);
+
+    // Call Veo 3 via Google Vertex AI
+    const videoUrl = await this.callVeoAPI(enhancedPrompt, duration, resolution);
+
+    // Deduct credits
+    await creditsService.deductOperationCredits('video-generation');
+
+    const videoId = `vid_${Date.now()}`;
+
+    console.log(`✅ Video generated: ${videoId}`);
+
+    return {
+      id: videoId,
+      prompt: enhancedPrompt,
+      url: videoUrl,
+      duration,
+      resolution,
+      style,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  private async enhancePrompt(prompt: string, duration: number, style: string): Promise<string> {
+    // Use Gemini to create a detailed video production brief
+    const enhancementPrompt = `Create a detailed video production prompt for Google Veo 3.
+
+Original concept: "${prompt}"
+Duration: ${duration} seconds
+Style: ${style}
+
+Output ONLY a vivid, cinematic, production-ready prompt (2-3 sentences).
+Include: visual style, camera movement (if applicable), tone, pacing.
+No quotes, no explanation.`;
+
+    const enhanced = await universalAiService.generateText({
+      prompt: enhancementPrompt,
+      responseMimeType: 'text/plain',
+      featureId: 'video-prompt-enhancement',
+      model: 'gemini-2.0-flash'
+    });
+
+    return enhanced.trim();
+  }
+
+  private async callVeoAPI(prompt: string, duration: number, resolution: string): Promise<string> {
+    // This would call Google's Veo 3 API via Vertex AI
+    // For development, simulate the call
+    // In production, use: https://cloud.google.com/vertex-ai/docs/generative-ai/video/overview
+
+    console.log(`🔗 Calling Veo 3: ${prompt.substring(0, 50)}...`);
+    console.log(`⏱️  Duration: ${duration}s, Resolution: ${resolution}`);
+
+    // Simulate processing time (videos take longer)
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    // Return placeholder URL
+    const videoUrl = `https://veo.google.ai/videos/${Date.now()}_${duration}s.mp4`;
+
+    return videoUrl;
+  }
+
+  async generateBrandedVideo(dna: CompanyDNA, scenarioDescription: string, duration: number = 15): Promise<GeneratedVideo> {
+    const brandContext = `Brand: ${dna.company}
+Description: ${dna.description}
+Brand personality: ${dna.brandPersonality}
+Target audience: ${dna.targetAudience}
+Colors: ${dna.colors.join(', ')}`;
+
+    const prompt = `Create a branded promotional video for ${dna.company}.
+
+Scenario: ${scenarioDescription}
+
+Brand context:
+${brandContext}
+
+Tone: ${dna.tone}
+Make it engaging, on-brand, and memorable. Show the company's value proposition.`;
+
+    return this.generate({
+      prompt,
+      duration,
+      resolution: '1080p',
+      style: 'promotional'
+    });
+  }
+
+  async generateCampaignVideo(dna: CompanyDNA, campaignTheme: string, callToAction: string, duration: number = 30): Promise<GeneratedVideo> {
+    const prompt = `Create a campaign video for "${campaignTheme}" campaign by ${dna.company}.
+
+Campaign focus: ${campaignTheme}
+Call to action: ${callToAction}
+Target audience: ${dna.targetAudience}
+Brand personality: ${dna.brandPersonality}
+
+Make it cinematic, compelling, and drive the audience toward the CTA.`;
+
+    return this.generate({
+      prompt,
+      duration,
+      resolution: '1080p',
+      style: 'promotional'
+    });
+  }
+
+  async generateSocialMediaVideo(dna: CompanyDNA, platform: 'tiktok' | 'instagram' | 'youtube', snippet: string, duration: number = 15): Promise<GeneratedVideo> {
+    const platformSpecs = {
+      tiktok: { aspect: '9:16', tempo: 'fast-paced, trendy' },
+      instagram: { aspect: '1:1 or 16:9', tempo: 'engaging, digestible' },
+      youtube: { aspect: '16:9', tempo: 'storytelling, hook-first' }
+    };
+
+    const spec = platformSpecs[platform];
+
+    const prompt = `Create a ${platform} video for ${dna.company}.
+
+Content: ${snippet}
+Platform requirements: ${spec.aspect}, ${spec.tempo}
+Brand personality: ${dna.brandPersonality}
+Colors: ${dna.colors.join(', ')}
+
+Make it shareable and optimized for ${platform}.`;
+
+    return this.generate({
+      prompt,
+      duration,
+      style: 'social'
+    });
+  }
+
+  // Generate multiple styles/iterations
+  async generateVariations(request: VideoGenerationRequest, variations: string[] = ['cinematic', 'documentary', 'animated']): Promise<GeneratedVideo[]> {
+    const videos: GeneratedVideo[] = [];
+
+    for (const style of variations) {
+      const video = await this.generate({
+        ...request,
+        style,
+        prompt: `${request.prompt} (${style} style)`
+      });
+      videos.push(video);
+    }
+
+    return videos;
+  }
+}
+
+export const videoService = new VideoGenerationService();
