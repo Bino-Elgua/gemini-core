@@ -1,24 +1,84 @@
+# Environment Variables
+.env
+.env.local
+.env.*.local
+.env.production
+.env.test
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build & Distribution
+dist/
+dist-ssr/
+build/
+*.tsbuildinfo
+.vite/
+.next/
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.env.local.example
+*.sublime-workspace
+.history/
+.vscode-test/
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
 # Logs
-logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 lerna-debug.log*
+.pnpm-debug.log*
+debug.log
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# OS
+Thumbs.db
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+.AppleDouble
+.LSOverride
+
+# Temporary Files
+*.tmp
+*.bak
+*.backup
+*_OLD
+*_BACKUP
+*~
+.#*
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# CI/CD
+.github/workflows/
+.gitlab-ci.yml
+.travis.yml
+
+# Cache
+.cache/
+.eslintcache
+.prettierignore
+
+# Misc
+.env.*.sh
+secrets.json
+api-keys.json
+.DS_Store
+.env.local
+.env.test
+config.local.js
