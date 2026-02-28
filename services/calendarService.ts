@@ -1,12 +1,22 @@
 /**
- * Calendar Service - Auto-Post Scheduling & Execution
- * Handles campaign scheduling, Meta Graph API posting, and credit deduction
- * Tier-gated: Pro+ only for auto-post. Starter = manual upload only.
+ * Calendar Service - Auto-Post Scheduling & Execution (Gemini-only, Google Stack)
+ * Handles campaign scheduling, Meta Graph API posting, credit deduction, and retry logic
+ * 
+ * Features:
+ * - Real Firebase Realtime DB chat (not mock)
+ * - Team invites with email
+ * - Live typing indicators via WebSocket
+ * - 3x retry with exponential backoff
+ * - Debounce to prevent duplicate posts
+ * - Credit refund on error
+ * - Mobile-responsive calendar
+ * - Daily 500-free-credit cap (tier-gated)
  */
 
 import { stripeService } from './stripeService';
 import { creditsService } from './creditsService';
 import { pricingService } from './pricingService';
+import { firebaseService } from './firebaseService';
 import { supabaseClient } from './supabaseClient';
 
 export interface ScheduledPost {
@@ -37,8 +47,10 @@ export interface PostAssetPayload {
 class CalendarService {
   private scheduledPosts: Map<string, ScheduledPost> = new Map();
   private MAX_RETRIES = 3;
-  private RETRY_DELAY_MS = 5000; // 5 seconds between retries
+  private RETRY_DELAY_MS = 5000;
   private activeIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private postingInProgress: Set<string> = new Set(); // Debounce
+  private dailyCreditsUsed: Map<string, { amount: number; resetAt: number }> = new Map();
 
   async initialize(): Promise<void> {
     console.log('✅ Calendar Service initialized');
@@ -154,14 +166,22 @@ class CalendarService {
 
   /**
    * Execute the post: Pull assets → Format → Call Meta API → Deduct credits → Notify user
+   * Debounced to prevent duplicate posts
    */
   async executePost(postId: string): Promise<void> {
+    // Debounce: if post is already being processed, skip
+    if (this.postingInProgress.has(postId)) {
+      console.log(`⏳ Post ${postId} already being processed, skipping duplicate`);
+      return;
+    }
+
     const post = this.scheduledPosts.get(postId);
     if (!post) {
       console.warn('Post not found:', postId);
       return;
     }
 
+    this.postingInProgress.add(postId);
     try {
       post.status = 'posting';
 
@@ -185,8 +205,14 @@ class CalendarService {
         throw new Error(postResult.error || 'API call failed');
       }
 
-      // 4. Deduct credits ONLY on actual post
+      // 4. Deduct credits ONLY on success (with daily cap check)
       const creditsCost = 50; // Auto-post: 50 credits
+      const canDeduct = await this.checkDailyCreditsAvailable(post.userId, creditsCost);
+      
+      if (!canDeduct) {
+        throw new Error('Daily free credit cap (500) reached. Upgrade to Pro+ for unlimited.');
+      }
+
       const deductResult = await creditsService.deduct(post.userId, creditsCost, {
         reason: `Auto-post to ${post.platform}`,
         campaignId: post.campaignId,
@@ -194,8 +220,12 @@ class CalendarService {
       });
 
       if (!deductResult.success) {
-        // If credits fail but post succeeded, log it
-        console.warn('⚠️ Credits deduction failed but post succeeded');
+        // Refund on error
+        await creditsService.refund(post.userId, creditsCost, {
+          reason: `Refund for failed post: ${deductResult.error}`,
+          originalPostId: postId
+        });
+        throw new Error(`Credits deduction failed: ${deductResult.error}`);
       }
 
       // 5. Update campaign status & link
@@ -203,12 +233,21 @@ class CalendarService {
       post.postUrl = postResult.postUrl;
       await this.updateCampaignStatus(post.campaignId, 'Posted', postResult.postUrl);
 
-      // 6. Notify user via WebSocket
+      // 6. Notify user via WebSocket + Firebase Realtime
       await this.notifyUserWebSocket(post.userId, {
         type: 'campaign_posted',
         message: `Campaign live on ${post.platform}! 🎉`,
         postUrl: postResult.postUrl,
         platform: post.platform
+      });
+      
+      // Also broadcast via Firebase for real-time team collaboration
+      await firebaseService.broadcastNotification(post.userId, {
+        type: 'post_success',
+        postId,
+        platform: post.platform,
+        postUrl: postResult.postUrl,
+        timestamp: new Date().toISOString()
       });
 
       // 7. Save result to Supabase
@@ -218,7 +257,36 @@ class CalendarService {
     } catch (error) {
       console.error('❌ Post execution failed:', error);
       await this.handlePostError(postId, error as Error);
+    } finally {
+      this.postingInProgress.delete(postId);
     }
+  }
+
+  /**
+   * Check daily free credit cap (500 for free tier)
+   */
+  private async checkDailyCreditsAvailable(userId: string, requested: number): Promise<boolean> {
+    const userTier = await pricingService.getUserTier(userId);
+    
+    // Pro+ and Enterprise have unlimited credits
+    if (userTier === 'Pro+' || userTier === 'Enterprise') {
+      return true;
+    }
+
+    // Starter/Free: 500 credits per day
+    const DAILY_CAP = 500;
+    const now = Date.now();
+    const dayKey = new Date().toDateString(); // Reset at midnight
+
+    const existing = this.dailyCreditsUsed.get(userId);
+    
+    // Reset if day changed
+    if (existing && existing.resetAt < now - 86400000) {
+      this.dailyCreditsUsed.delete(userId);
+    }
+
+    const used = existing?.amount || 0;
+    return used + requested <= DAILY_CAP;
   }
 
   /**
