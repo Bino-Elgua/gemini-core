@@ -36,8 +36,8 @@
 
 ### 1. Clone & Install
 ```bash
-git clone https://github.com/Bino-Elgua/Full-Core.git
-cd Full-Core
+git clone https://github.com/Bino-Elgua/gemini-core.git
+cd gemini-core
 npm install
 ```
 
@@ -167,14 +167,14 @@ Savings: $24,951/month = $299,412/year
 ## 📁 Project Structure
 
 ```
-Full-Core/
+gemini-core/
 ├── services/
 │   ├── geminiOnlyService.ts ............ Unified Gemini API
 │   ├── autoPostService.ts ............. Scheduling + retry logic (3x)
 │   ├── firebaseRealtimeService.ts ..... Live chat + sessions
 │   ├── creditSystemService.ts ......... Billing + quota management
 │   ├── advancedSecurityService.ts ..... SCIM + MFA + audit logs
-│   └── [60+ enterprise services]
+│   └── [68 enterprise services]
 ├── pages/
 │   ├── IntelligenceHubPage.tsx ........ AI-powered DNA extraction
 │   ├── CampaignForgeGooglePage.tsx .... Multi-platform generation
@@ -413,7 +413,7 @@ npm run test:e2e:report       # HTML coverage report
 ## 👨‍💻 Author & Contributors
 
 **Bino-Elgua**  
-→ [GitHub](https://github.com/Bino-Elgua) | [Email](mailto:dev@example.com)
+→ [GitHub](https://github.com/Bino-Elgua/gemini-core) | [Email](mailto:dev@example.com)
 
 ---
 
