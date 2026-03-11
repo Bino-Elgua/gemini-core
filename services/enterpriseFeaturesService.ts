@@ -299,7 +299,7 @@ class EnterpriseFeaturesService {
     dataResidency: string;
     ssoEnabled: boolean;
     encryptionEnabled: boolean;
-    audits: typeof this.complianceAudits;
+    audits: any[];
   }> {
     return {
       mode: this.config.complianceMode,

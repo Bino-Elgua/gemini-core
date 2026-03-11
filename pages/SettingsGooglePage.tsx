@@ -25,7 +25,7 @@ export default function SettingsGooglePage() {
   // Test API key
   const handleTestKey = async () => {
     if (!apiKey.trim()) {
-      toastService.error('Please enter an API key');
+      toastService.error('Missing Key', 'Please enter an API key');
       return;
     }
 
@@ -40,14 +40,14 @@ export default function SettingsGooglePage() {
 
       if (status.healthy) {
         setIsValid(true);
-        toastService.success('✅ API key is valid');
+        toastService.success('Valid Key', '✅ API key is valid');
       } else {
         setIsValid(false);
-        toastService.error(status.message);
+        toastService.error('Invalid Key', status.message);
       }
     } catch (error) {
       setIsValid(false);
-      toastService.error('Invalid API key');
+      toastService.error('Error', 'Invalid API key');
     } finally {
       setTesting(false);
     }
@@ -56,19 +56,19 @@ export default function SettingsGooglePage() {
   // Save API key
   const handleSaveKey = () => {
     if (!apiKey.trim()) {
-      toastService.error('Please enter an API key');
+      toastService.error('Missing Key', 'Please enter an API key');
       return;
     }
 
     if (!isValid) {
-      toastService.error('Please test and validate the API key first');
+      toastService.error('Validation Needed', 'Please test and validate the API key first');
       return;
     }
 
     localStorage.setItem('gemini_api_key', apiKey);
     geminiService.initialize({ apiKey });
     setSaved(true);
-    toastService.success('✅ API key saved');
+    toastService.success('Success', '✅ API key saved');
   };
 
   // Clear key
@@ -78,7 +78,7 @@ export default function SettingsGooglePage() {
       setApiKey('');
       setIsValid(false);
       setSaved(false);
-      toastService.info('API key cleared');
+      toastService.info('Cleared', 'API key cleared');
     }
   };
 

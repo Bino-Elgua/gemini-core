@@ -4,7 +4,7 @@
  */
 
 import { firebaseService } from './firebaseService';
-import { pricingService } from './pricingService';
+import { pricingService, Tier } from './pricingService';
 
 export interface FeatureAccessResult {
   allowed: boolean;
@@ -31,7 +31,7 @@ class AuthServiceTierExtensions {
       };
     }
 
-    const tier = user.tier || 'free';
+    const tier = (user.tier || 'free') as any;
     const config = pricingService.getTierConfig(tier);
 
     // Map feature requests to tier features
@@ -55,7 +55,7 @@ class AuthServiceTierExtensions {
 
     const hasFeature = config.features[tieredFeature];
     if (!hasFeature) {
-      const prompt = pricingService.getUpgradePrompt(tier, feature);
+      const prompt = pricingService.getUpgradePrompt(tier as any, feature);
       return {
         allowed: false,
         reason: prompt?.message || `"${feature}" is not available on ${tier} tier`,
@@ -75,7 +75,6 @@ class AuthServiceTierExtensions {
    * Check if user has enough credits for operation
    */
   async canAffordOperation(userId: string, operation: string): Promise<FeatureAccessResult> {
-    const user = await firebaseService.getUserProfile(userId);
     const balance = await firebaseService.getCreditsBalance(userId);
 
     // Get cost for this operation (might vary by tier)
@@ -144,7 +143,7 @@ class AuthServiceTierExtensions {
     }
 
     const suggestedTier = result.suggestedAction?.tier;
-    const tierConfig = suggestedTier ? pricingService.getTierConfig(suggestedTier) : null;
+    const tierConfig = suggestedTier ? pricingService.getTierConfig(suggestedTier as any) : null;
     const price = tierConfig ? `$${(tierConfig.monthlyPrice / 100).toFixed(2)}/month` : 'contact us';
 
     return {
@@ -196,13 +195,13 @@ class AuthServiceTierExtensions {
     warningActive?: boolean;
   }> {
     const user = await firebaseService.getUserProfile(userId);
-    const tier = await this.getEffectiveTier(userId);
+    const tier = (await this.getEffectiveTier(userId)) as any;
 
     if (!user?.nextBillingDate) {
       return {
         tier,
         status: 'no-subscription'
-      };
+      } as any;
     }
 
     const nextBilling = new Date(user.nextBillingDate);
@@ -215,7 +214,7 @@ class AuthServiceTierExtensions {
       nextBillingDate: user.nextBillingDate,
       daysUntilRenewal: daysUntil,
       warningActive: daysUntil <= 7 && daysUntil > 0
-    };
+    } as any;
   }
 }
 

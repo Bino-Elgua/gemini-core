@@ -48,7 +48,7 @@ class SentryService {
     }
 
     try {
-      const integrations: Sentry.Integration[] = [
+      const integrations: any[] = [
         new BrowserTracing({
           tracePropagationTargets: ['localhost', /^\//],
           shouldCreateSpanForRequest: (url) => {

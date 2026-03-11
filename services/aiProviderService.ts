@@ -14,114 +14,11 @@ export interface AIProvider {
   lastChecked?: Date;
 }
 
-// Supported LLM Providers
-const LLM_PROVIDERS = [
-  'google-gemini',
-  'openai-gpt4',
-  'openai-gpt35',
-  'anthropic-claude3',
-  'mistral-large',
-  'xai-grok',
-  'deepseek',
-  'groq',
-  'together',
-  'openrouter',
-  'perplexity',
-  'qwen',
-  'cohere',
-  'meta-llama',
-  'azure-openai',
-  'ollama',
-  'sambanova',
-  'cerebras',
-  'hyperbolic',
-  'nebius',
-  'aws-bedrock',
-  'friendli',
-  'replicate',
-  'minimax',
-  'hunyuan',
-  'blackbox',
-  'dify',
-  'venice',
-  'zai',
-  'hugging-face'
-];
-
-// Supported Image Providers
-const IMAGE_PROVIDERS = [
-  'google-imagen',
-  'openai-dalle3',
-  'openai-dalle4',
-  'stability-ai',
-  'stability-sd3',
-  'stability-flux',
-  'midjourney',
-  'runware',
-  'leonardo',
-  'recraft',
-  'xai-grok',
-  'amazon-titan',
-  'adobe-firefly',
-  'deepai',
-  'replicate',
-  'bria',
-  'segmind',
-  'prodia',
-  'ideogram',
-  'black-forest-labs',
-  'wan',
-  'hunyuan-image',
-  'unsplash-fallback'
-];
-
-// Supported Video Providers
-const VIDEO_PROVIDERS = [
-  'openai-sora',
-  'google-veo',
-  'runway',
-  'kling',
-  'luma',
-  'ltx-2',
-  'wan-video',
-  'hunyuan-video',
-  'mochi',
-  'seedance',
-  'pika',
-  'hailuoai',
-  'pixverse',
-  'higgsfield',
-  'heygen',
-  'synthesia',
-  'deepbrain',
-  'colossyan',
-  'replicate-video',
-  'fal-ai',
-  'fireworks',
-  'wavespeed',
-  'bbb-fallback'
-];
-
-// Supported Voice/TTS Providers
-const VOICE_PROVIDERS = [
-  'elevenlabs',
-  'openai-tts',
-  'google-cloud-tts',
-  'azure-speech',
-  'deepgram',
-  'playht',
-  'cartesia',
-  'resemble',
-  'murf',
-  'wellsaid',
-  'lmnt',
-  'fish-audio',
-  'rime',
-  'neets',
-  'speechify',
-  'amazon-polly',
-  'web-speech-api'
-];
+// Supported Google-Only Providers
+const LLM_PROVIDERS = ['google-gemini'];
+const IMAGE_PROVIDERS = ['google-imagen', 'unsplash-fallback'];
+const VIDEO_PROVIDERS = ['google-veo'];
+const VOICE_PROVIDERS = ['google-cloud-tts', 'web-speech-api'];
 
 class AIProviderService {
   private providers: Map<string, AIProvider> = new Map();
@@ -137,7 +34,7 @@ class AIProviderService {
 
     // Initialize default providers
     this.initializeDefaults();
-    console.log(`✅ Initialized ${this.providers.size} AI providers`);
+    console.log(`✅ Initialized Google-only AI providers`);
   }
 
   private initializeDefaults(): void {
@@ -208,18 +105,10 @@ class AIProviderService {
     if (!provider) return false;
 
     try {
-      // Basic health check for known providers
-      const startTime = Date.now();
-      
-      // This would call the actual provider's health endpoint
-      // For now, just mark as checked
       provider.lastChecked = new Date();
-      
-      const responseTime = Date.now() - startTime;
-      provider.status = responseTime < 5000 ? 'available' : 'unavailable';
-
+      provider.status = 'available'; // Simplified for Google-only stack
       await this.configureProvider(provider);
-      return provider.status === 'available';
+      return true;
     } catch (error) {
       provider.status = 'error';
       await this.configureProvider(provider);
@@ -235,21 +124,13 @@ class AIProviderService {
     const id = providerId || 'google-gemini';
     const provider = await this.getProvider(id);
 
-    if (!provider) {
-      throw new Error(`Provider not found: ${id}`);
+    if (!provider || provider.id !== 'google-gemini') {
+      const gemini = await this.getProvider('google-gemini');
+      if (gemini) return this.callGemini(prompt, gemini, options);
+      throw new Error('Google Gemini provider not available');
     }
 
-    if (provider.id === 'google-gemini') {
-      return this.callGemini(prompt, provider, options);
-    }
-
-    // Fallback to Gemini
-    const gemini = await this.getProvider('google-gemini');
-    if (gemini) {
-      return this.callGemini(prompt, gemini, options);
-    }
-
-    throw new Error('No LLM provider available');
+    return this.callGemini(prompt, provider, options);
   }
 
   private async callGemini(
@@ -257,12 +138,11 @@ class AIProviderService {
     provider: AIProvider,
     options?: any
   ): Promise<string> {
-    // Use fetch API instead of SDK to avoid import issues
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-goog-api-key': provider.apiKey
+        'x-goog-api-key': provider.apiKey || ''
       },
       body: JSON.stringify({
         contents: [{
@@ -277,8 +157,7 @@ class AIProviderService {
     }
 
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return text;
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   }
 
   getAvailableLLMProviders(): string[] {

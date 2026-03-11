@@ -7,6 +7,7 @@
 export interface ScrapedData {
   url: string;
   title: string;
+  description?: string;
   metaDescription: string;
   h1: string[];
   h2: string[];

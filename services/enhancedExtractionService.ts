@@ -77,6 +77,7 @@ export const enhanceBrandExtraction = async (
       return {
         id: crypto.randomUUID(),
         url,
+        description: scrapedData?.description || 'Automated extraction',
         extractedAt: new Date().toISOString(),
         name: scrapedData?.title || 'New Brand',
         tagline: 'Precision Brand Protocol',

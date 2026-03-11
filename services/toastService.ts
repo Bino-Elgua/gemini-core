@@ -32,17 +32,38 @@ class ToastService {
     this.listeners.forEach(l => l(toast));
   }
 
-  success(title: string, message: string) {
-    this.notify('success', title, message);
+  success(title: string, message?: string) {
+    if (message === undefined) {
+      this.notify('success', 'Success', title);
+    } else {
+      this.notify('success', title, message);
+    }
   }
 
-  error(title: string, message: string) {
-    this.notify('error', title, message);
+  error(title: string, message?: string) {
+    if (message === undefined) {
+      this.notify('error', 'Error', title);
+    } else {
+      this.notify('error', title, message);
+    }
   }
 
-  info(title: string, message: string) {
-    this.notify('info', title, message);
+  info(title: string, message?: string) {
+    if (message === undefined) {
+      this.notify('info', 'Info', title);
+    } else {
+      this.notify('info', title, message);
+    }
+  }
+
+  warning(title: string, message?: string) {
+    if (message === undefined) {
+      this.notify('warning', 'Warning', title);
+    } else {
+      this.notify('warning', title, message);
+    }
   }
 }
 
 export const toast = new ToastService();
+export const toastService = toast;

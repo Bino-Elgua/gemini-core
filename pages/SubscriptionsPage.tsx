@@ -16,12 +16,12 @@ export default function SubscriptionsPage() {
   // Handle upgrade
   const handleUpgrade = (tier: SubscriptionTier) => {
     if (tier === currentTier) {
-      toastService.info('Already on this plan');
+      toastService.info('Already Enrolled', 'Already on this plan');
       return;
     }
 
     // In production: process payment via Stripe
-    toastService.success(`✅ Upgraded to ${creditSystemService.getPlan(tier).name}`);
+    toastService.success('Success', `✅ Upgraded to ${creditSystemService.getPlan(tier).name}`);
     setCurrentTier(tier);
   };
 
@@ -45,7 +45,7 @@ export default function SubscriptionsPage() {
 
     if (result.success) {
       setCredits(result.newCredits.totalCredits);
-      toastService.success(`✅ ${pack.name} purchased! +${pack.credits} credits`);
+      toastService.success('Purchase Successful', `✅ ${pack.name} purchased! +${pack.credits} credits`);
     }
   };
 

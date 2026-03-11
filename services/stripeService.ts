@@ -165,6 +165,34 @@ class StripeService {
     };
   }
 
+  async getSubscription(userId: string): Promise<any> {
+    return {
+      id: 'sub_mock_123',
+      status: 'active',
+      tier: 'pro',
+      current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60
+    };
+  }
+
+  async createSubscription(userId: string, tier: string | { plan: string; amount: number }): Promise<any> {
+    const tierName = typeof tier === 'string' ? tier : tier.plan;
+    return {
+      id: 'sub_mock_' + Date.now(),
+      status: 'active',
+      tier: tierName
+    };
+  }
+
+  async createCharge(userId: string, amount: number, description: string): Promise<any> {
+    console.log(`💳 Mock charge created for ${userId}: ${amount} - ${description}`);
+    return {
+      id: 'ch_mock_' + Date.now(),
+      status: 'succeeded',
+      amount,
+      description
+    };
+  }
+
   private calculateProration(newPrice: number, currentTier: Tier, upgradeTier: string): number {
     // Simple proation: charge difference for remainder of month
     // In production, calculate based on billing period

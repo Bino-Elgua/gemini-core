@@ -4,8 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { pricingService, TierConfig } from '../services/pricingService';
-import { stripeService } from '../services/stripeService';
+import { pricingService, TierConfig, Tier } from '@/services/pricingService';
+import { stripeService } from '@/services/stripeService';
 import { Check, X } from 'lucide-react';
 
 interface TierSelectorProps {
@@ -20,7 +20,7 @@ export const TierSelector: React.FC<TierSelectorProps> = ({
   isLoading = false 
 }) => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
-  const tiers = pricingService.getAllTiers().filter(t => t.tier !== 'free');
+  const tiers = pricingService.getAllTiers().filter((t: TierConfig) => t.tier !== 'free');
 
   const features = [
     { key: 'dnaExtraction', label: 'DNA Extraction' },
@@ -67,13 +67,12 @@ export const TierSelector: React.FC<TierSelectorProps> = ({
 
       {/* Tier Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-        {tiers.map((tier) => {
+        {tiers.map((tier: TierConfig) => {
           const price = stripeService.getSubscriptionPrice(
             tier.tier as 'pro' | 'enterprise',
             billingCycle
           );
           const isCurrent = currentTier === tier.tier;
-          const isStarter = currentTier === 'starter';
 
           return (
             <div
@@ -148,7 +147,7 @@ export const TierSelector: React.FC<TierSelectorProps> = ({
           <thead>
             <tr className="border-b border-zinc-800">
               <th className="text-left py-4 px-4 text-zinc-300 font-semibold">Feature</th>
-              {tiers.map((tier) => (
+              {tiers.map((tier: TierConfig) => (
                 <th
                   key={tier.tier}
                   className={`text-center py-4 px-4 font-semibold ${
@@ -164,7 +163,7 @@ export const TierSelector: React.FC<TierSelectorProps> = ({
             {features.map((feature) => (
               <tr key={feature.key} className="border-b border-zinc-900">
                 <td className="py-3 px-4 text-zinc-400">{feature.label}</td>
-                {tiers.map((tier) => {
+                {tiers.map((tier: TierConfig) => {
                   const hasFeature = tier.features[feature.key as keyof typeof tier.features];
                   return (
                     <td key={tier.tier} className="text-center py-3 px-4">

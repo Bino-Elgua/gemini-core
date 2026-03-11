@@ -71,6 +71,10 @@ class HybridStorageService {
     }
   }
 
+  async delete(key: string): Promise<void> {
+    return this.remove(key);
+  }
+
   async getAll(): Promise<Record<string, any>> {
     const result: Record<string, any> = {};
     for (const [key, item] of this.cache) {

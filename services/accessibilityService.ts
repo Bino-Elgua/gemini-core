@@ -419,7 +419,7 @@ class AccessibilityService {
         const ariaLabel = input.getAttribute('aria-label');
         const ariaLabelledBy = input.getAttribute('aria-labelledby');
         
-        let hasLabel = ariaLabel || ariaLabelledBy;
+        let hasLabel = !!(ariaLabel || ariaLabelledBy);
 
         // Check for associated label
         if (!hasLabel && id) {

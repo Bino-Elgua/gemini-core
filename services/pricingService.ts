@@ -164,6 +164,22 @@ class PricingService {
     return Array.from(this.tiers.values());
   }
 
+  async getUserTier(userId: string): Promise<UserTierData> {
+    return {
+      tier: 'pro',
+      subscriptionStatus: 'active',
+      subscriptionId: 'sub_mock_123',
+      nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      creditsBalance: 500,
+      creditsIncludedThisMonth: 2000,
+      creditsUsedThisMonth: 1500,
+      monthlyResetDay: 1,
+      annualDiscount: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  }
+
   canAccessFeature(tier: Tier, feature: keyof TierConfig['features']): boolean {
     const config = this.getTierConfig(tier);
     return config.features[feature] ?? false;

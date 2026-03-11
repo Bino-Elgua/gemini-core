@@ -20,6 +20,11 @@ import {
   update,
   remove,
   onValue,
+  off,
+  query,
+  orderByChild,
+  equalTo,
+  push,
   Database
 } from 'firebase/database';
 import {
@@ -27,8 +32,7 @@ import {
   ref as storageRef,
   uploadBytes,
   getBytes,
-  deleteObject,
-  Storage
+  deleteObject
 } from 'firebase/storage';
 
 // Initialize Firebase
@@ -139,6 +143,87 @@ class FirebaseService {
     });
   }
 
+  // ===== LIVE SESSIONS / CHAT =====
+
+  async getSessionMessages(sessionId: string) {
+    const snapshot = await get(ref(db, `sessions/${sessionId}/messages`));
+    const val = snapshot.val();
+    return val ? Object.values(val) : [];
+  }
+
+  async subscribeToSessionMessages(sessionId: string, callback: (messages: any[]) => void) {
+    const messagesRef = ref(db, `sessions/${sessionId}/messages`);
+    const listener = onValue(messagesRef, (snapshot) => {
+      const val = snapshot.val();
+      callback(val ? Object.values(val) : []);
+    });
+    return () => off(messagesRef, 'value', listener);
+  }
+
+  async saveSessionMessage(sessionId: string, message: any) {
+    const messageRef = push(ref(db, `sessions/${sessionId}/messages`));
+    await set(messageRef, message);
+  }
+
+  async setUserTyping(sessionId: string, userId: string, isTyping: boolean) {
+    await update(ref(db, `sessions/${sessionId}/presence/${userId}`), {
+      isTyping,
+      lastSeen: Date.now()
+    });
+  }
+
+  async getTypingUsers(sessionId: string) {
+    const snapshot = await get(ref(db, `sessions/${sessionId}/presence`));
+    const val = snapshot.val();
+    if (!val) return [];
+    return Object.values(val).filter((u: any) => u.isTyping);
+  }
+
+  async setUserPresence(sessionId: string, userId: string, presence: any) {
+    await update(ref(db, `sessions/${sessionId}/presence/${userId}`), presence);
+  }
+
+  async saveTeamInvite(sessionId: string, invite: any) {
+    await set(ref(db, `invites/${invite.id}`), {
+      ...invite,
+      sessionId
+    });
+  }
+
+  async acceptTeamInvite(inviteId: string, userId: string) {
+    const inviteRef = ref(db, `invites/${inviteId}`);
+    const snapshot = await get(inviteRef);
+    const invite = snapshot.val();
+    
+    if (!invite) return false;
+
+    // Add user to session team
+    await update(ref(db, `sessions/${invite.sessionId}/team/${userId}`), {
+      userId,
+      role: 'editor',
+      joinedAt: Date.now()
+    });
+
+    // Mark invite as accepted
+    await update(inviteRef, { status: 'accepted' });
+    return true;
+  }
+
+  async getSessionTeamMembers(sessionId: string) {
+    const snapshot = await get(ref(db, `sessions/${sessionId}/team`));
+    const val = snapshot.val();
+    return val ? Object.values(val) : [];
+  }
+
+  async getPendingInvites(email: string) {
+    const invitesRef = ref(db, 'invites');
+    const pendingQuery = query(invitesRef, orderByChild('toEmail'), equalTo(email));
+    const snapshot = await get(pendingQuery);
+    const val = snapshot.val();
+    if (!val) return [];
+    return Object.values(val).filter((i: any) => i.status === 'pending');
+  }
+
   // ===== STORAGE =====
 
   async uploadFile(uid: string, fileName: string, file: Blob) {
@@ -213,6 +298,64 @@ class FirebaseService {
   async getCreditsBalance(uid: string): Promise<number> {
     const user = await this.getUserProfile(uid);
     return user?.credits || 0;
+  }
+
+  // ===== SCHEDULED POSTS =====
+
+  async saveScheduledPost(userId: string, postId: string, postData: any) {
+    await set(ref(db, `scheduled_posts/${userId}/${postId}`), {
+      ...postData,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  async updateScheduledPost(userId: string, postId: string, updates: any) {
+    await update(ref(db, `scheduled_posts/${userId}/${postId}`), {
+      ...updates,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  async listPendingScheduledPosts() {
+    // This is tricky in Firebase without indexing all users' posts
+    // For now, we'll assume a global 'pending_posts' queue or just list all users
+    // Better: store a global list of scheduled posts for the service to watch
+    const snapshot = await get(ref(db, 'scheduled_posts'));
+    const allUsersPosts = snapshot.val() || {};
+    const pending: any[] = [];
+    
+    Object.keys(allUsersPosts).forEach(userId => {
+      Object.keys(allUsersPosts[userId]).forEach(postId => {
+        const post = allUsersPosts[userId][postId];
+        if (post.status === 'pending') {
+          pending.push({ ...post, userId });
+        }
+      });
+    });
+    
+    return pending;
+  }
+
+  async getCampaignAsset(userId: string, campaignId: string, assetId: string) {
+    const campaign = await this.getCampaign(userId, campaignId);
+    if (!campaign || !campaign.assets) return null;
+    return campaign.assets.find((a: any) => a.id === assetId) || null;
+  }
+
+  // ===== NOTIFICATIONS =====
+
+  async broadcastNotification(userId: string, notification: any) {
+    const notificationId = push(ref(db, `notifications/${userId}`)).key;
+    await set(ref(db, `notifications/${userId}/${notificationId}`), {
+      ...notification,
+      read: false,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Also trigger a value update for real-time listeners
+    await update(ref(db, `users/${userId}`), {
+      lastNotification: notification
+    });
   }
 }
 

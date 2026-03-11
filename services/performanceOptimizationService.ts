@@ -150,7 +150,7 @@ class PerformanceOptimizationService {
   }> {
     const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000);
     const recentMetrics = this.performanceLogs.filter(
-      m => (m as unknown as Record<string, unknown>).timestamp >= cutoffTime
+      m => (m as any).timestamp >= cutoffTime.getTime()
     );
 
     if (recentMetrics.length === 0) {

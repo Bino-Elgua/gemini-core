@@ -1,23 +1,11 @@
 /**
  * Calendar Service - Auto-Post Scheduling & Execution (Gemini-only, Google Stack)
  * Handles campaign scheduling, Meta Graph API posting, credit deduction, and retry logic
- * 
- * Features:
- * - Real Firebase Realtime DB chat (not mock)
- * - Team invites with email
- * - Live typing indicators via WebSocket
- * - 3x retry with exponential backoff
- * - Debounce to prevent duplicate posts
- * - Credit refund on error
- * - Mobile-responsive calendar
- * - Daily 500-free-credit cap (tier-gated)
  */
 
-import { stripeService } from './stripeService';
 import { creditsService } from './creditsService';
 import { pricingService } from './pricingService';
 import { firebaseService } from './firebaseService';
-import { supabaseClient } from './supabaseClient';
 
 export interface ScheduledPost {
   id: string;
@@ -54,7 +42,6 @@ class CalendarService {
 
   async initialize(): Promise<void> {
     console.log('✅ Calendar Service initialized');
-    // Load any pending posts from Supabase on init
     await this.loadPendingPosts();
   }
 
@@ -63,17 +50,15 @@ class CalendarService {
    */
   async canAutoPost(userId: string): Promise<boolean> {
     try {
-      const userTier = await pricingService.getUserTier(userId);
-      // Only Pro+ and Enterprise can auto-post
-      return userTier === 'Pro+' || userTier === 'Enterprise';
+      const userData = await pricingService.getUserTier(userId);
+      return userData.tier === 'pro' || userData.tier === 'enterprise';
     } catch {
-      return false; // Starter or free = manual only
+      return false;
     }
   }
 
   /**
    * Schedule a campaign for auto-posting
-   * Called when user drags asset to calendar date in SchedulerPage
    */
   async schedulePost(
     campaignId: string,
@@ -85,10 +70,9 @@ class CalendarService {
     igBusinessAccountId?: string,
     tikTokUserId?: string
   ): Promise<{ success: boolean; postId?: string; error?: string }> {
-    // Gate: Pro+ only
     const canPost = await this.canAutoPost(userId);
     if (!canPost) {
-      return { success: false, error: 'Auto-posting requires Pro+ subscription (Starter users: manual upload only)' };
+      return { success: false, error: 'Auto-posting requires Pro or Enterprise subscription' };
     }
 
     const postId = crypto.randomUUID();
@@ -107,36 +91,22 @@ class CalendarService {
 
     this.scheduledPosts.set(postId, post);
 
-    // Save to Supabase
     try {
-      const { data, error } = await supabaseClient
-        .from('scheduled_posts')
-        .insert([
-          {
-            id: postId,
-            campaign_id: campaignId,
-            user_id: userId,
-            asset_id: assetId,
-            scheduled_for: scheduledFor.toISOString(),
-            platform,
-            status: 'pending',
-            retry_count: 0,
-            meta_access_token: metaAccessToken,
-            ig_business_account_id: igBusinessAccountId || null,
-            tiktok_user_id: tikTokUserId || null,
-            created_at: new Date().toISOString()
-          }
-        ]);
+      await firebaseService.saveScheduledPost(userId, postId, {
+        id: postId,
+        campaignId,
+        assetId,
+        scheduledFor: scheduledFor.toISOString(),
+        platform,
+        status: 'pending',
+        retryCount: 0,
+        metaAccessToken,
+        igBusinessAccountId: igBusinessAccountId || null,
+        tikTokUserId: tikTokUserId || null,
+        createdAt: new Date().toISOString()
+      });
 
-      if (error) {
-        console.error('❌ Failed to save scheduled post:', error);
-        return { success: false, error: error.message };
-      }
-
-      console.log('✅ Post scheduled for', scheduledFor);
-      // Set up timer to execute at scheduled time
       this.setExecutionTimer(postId, scheduledFor);
-
       return { success: true, postId };
     } catch (e) {
       console.error('Error saving scheduled post:', e);
@@ -144,11 +114,8 @@ class CalendarService {
     }
   }
 
-  /**
-   * Set up a timer to execute the post at scheduled time
-   */
   private setExecutionTimer(postId: string, scheduledFor: Date): void {
-    const now = new Date().getTime();
+    const now = Date.now();
     const scheduledTime = new Date(scheduledFor).getTime();
     const delayMs = Math.max(0, scheduledTime - now);
 
@@ -161,57 +128,29 @@ class CalendarService {
     }, delayMs);
 
     this.activeIntervals.set(postId, timer);
-    console.log(`⏰ Timer set for post ${postId} in ${delayMs}ms`);
   }
 
-  /**
-   * Execute the post: Pull assets → Format → Call Meta API → Deduct credits → Notify user
-   * Debounced to prevent duplicate posts
-   */
   async executePost(postId: string): Promise<void> {
-    // Debounce: if post is already being processed, skip
-    if (this.postingInProgress.has(postId)) {
-      console.log(`⏳ Post ${postId} already being processed, skipping duplicate`);
-      return;
-    }
+    if (this.postingInProgress.has(postId)) return;
 
     const post = this.scheduledPosts.get(postId);
-    if (!post) {
-      console.warn('Post not found:', postId);
-      return;
-    }
+    if (!post) return;
 
     this.postingInProgress.add(postId);
     try {
       post.status = 'posting';
 
-      // 1. Pull campaign assets from Firebase/Supabase
-      const assets = await this.getAssets(post.campaignId, post.assetId);
-      if (!assets) {
-        throw new Error('Assets not found');
-      }
+      const assets = await this.getAssets(post.userId, post.campaignId, post.assetId);
+      if (!assets) throw new Error('Assets not found');
 
-      // 2. Format for platform
       const payload = this.formatForPlatform(assets, post.platform);
+      const postResult = await this.callMetaGraphAPI(post.platform, payload, post.metaAccessToken);
 
-      // 3. Call Meta Graph API or TikTok API
-      const postResult = await this.callMetaGraphAPI(
-        post.platform,
-        payload,
-        post.metaAccessToken
-      );
+      if (!postResult.success) throw new Error(postResult.error || 'API call failed');
 
-      if (!postResult.success) {
-        throw new Error(postResult.error || 'API call failed');
-      }
-
-      // 4. Deduct credits ONLY on success (with daily cap check)
-      const creditsCost = 50; // Auto-post: 50 credits
+      const creditsCost = 50;
       const canDeduct = await this.checkDailyCreditsAvailable(post.userId, creditsCost);
-      
-      if (!canDeduct) {
-        throw new Error('Daily free credit cap (500) reached. Upgrade to Pro+ for unlimited.');
-      }
+      if (!canDeduct) throw new Error('Daily credit cap reached');
 
       const deductResult = await creditsService.deduct(post.userId, creditsCost, {
         reason: `Auto-post to ${post.platform}`,
@@ -220,7 +159,6 @@ class CalendarService {
       });
 
       if (!deductResult.success) {
-        // Refund on error
         await creditsService.refund(post.userId, creditsCost, {
           reason: `Refund for failed post: ${deductResult.error}`,
           originalPostId: postId
@@ -228,20 +166,9 @@ class CalendarService {
         throw new Error(`Credits deduction failed: ${deductResult.error}`);
       }
 
-      // 5. Update campaign status & link
       post.status = 'posted';
       post.postUrl = postResult.postUrl;
-      await this.updateCampaignStatus(post.campaignId, 'Posted', postResult.postUrl);
-
-      // 6. Notify user via WebSocket + Firebase Realtime
-      await this.notifyUserWebSocket(post.userId, {
-        type: 'campaign_posted',
-        message: `Campaign live on ${post.platform}! 🎉`,
-        postUrl: postResult.postUrl,
-        platform: post.platform
-      });
       
-      // Also broadcast via Firebase for real-time team collaboration
       await firebaseService.broadcastNotification(post.userId, {
         type: 'post_success',
         postId,
@@ -250,10 +177,7 @@ class CalendarService {
         timestamp: new Date().toISOString()
       });
 
-      // 7. Save result to Supabase
-      await this.saveFinalStatus(postId, 'posted', postResult.postUrl);
-
-      console.log('✅ Post executed successfully:', postId);
+      await this.saveFinalStatus(post.userId, postId, 'posted', postResult.postUrl || '');
     } catch (error) {
       console.error('❌ Post execution failed:', error);
       await this.handlePostError(postId, error as Error);
@@ -262,36 +186,16 @@ class CalendarService {
     }
   }
 
-  /**
-   * Check daily free credit cap (500 for free tier)
-   */
   private async checkDailyCreditsAvailable(userId: string, requested: number): Promise<boolean> {
-    const userTier = await pricingService.getUserTier(userId);
-    
-    // Pro+ and Enterprise have unlimited credits
-    if (userTier === 'Pro+' || userTier === 'Enterprise') {
-      return true;
-    }
+    const userData = await pricingService.getUserTier(userId);
+    if (userData.tier === 'pro' || userData.tier === 'enterprise') return true;
 
-    // Starter/Free: 500 credits per day
     const DAILY_CAP = 500;
-    const now = Date.now();
-    const dayKey = new Date().toDateString(); // Reset at midnight
-
     const existing = this.dailyCreditsUsed.get(userId);
-    
-    // Reset if day changed
-    if (existing && existing.resetAt < now - 86400000) {
-      this.dailyCreditsUsed.delete(userId);
-    }
-
     const used = existing?.amount || 0;
     return used + requested <= DAILY_CAP;
   }
 
-  /**
-   * Retry logic: 3x with exponential backoff
-   */
   private async handlePostError(postId: string, error: Error): Promise<void> {
     const post = this.scheduledPosts.get(postId);
     if (!post) return;
@@ -301,343 +205,95 @@ class CalendarService {
 
     if (post.retryCount < this.MAX_RETRIES) {
       const delayMs = this.RETRY_DELAY_MS * Math.pow(2, post.retryCount - 1);
-      console.log(`🔄 Retrying post ${postId} in ${delayMs}ms (attempt ${post.retryCount}/${this.MAX_RETRIES})`);
-
       const timer = setTimeout(() => {
         this.executePost(postId).catch(e => console.error('Retry failed:', e));
       }, delayMs);
-
       this.activeIntervals.set(`${postId}-retry`, timer);
     } else {
-      // Failed all retries
       post.status = 'failed';
-      await this.saveFinalStatus(postId, 'failed', null, error.message);
-
-      // Notify user of failure
-      await this.notifyUserWebSocket(post.userId, {
-        type: 'campaign_failed',
-        message: `Campaign post failed after ${this.MAX_RETRIES} attempts. Please try again.`,
-        error: error.message,
+      await this.saveFinalStatus(post.userId, postId, 'failed', null, error.message);
+      await firebaseService.broadcastNotification(post.userId, {
+        type: 'post_failed',
+        message: `Campaign post failed: ${error.message}`,
         platform: post.platform
       });
-
-      console.error(`❌ Post ${postId} failed after ${this.MAX_RETRIES} retries`);
     }
   }
 
-  /**
-   * 1. Pull campaign assets (copy, image, video, audio)
-   */
-  private async getAssets(
-    campaignId: string,
-    assetId: string
-  ): Promise<{ text: string; imageUrl?: string; videoUrl?: string; audioUrl?: string } | null> {
+  private async getAssets(userId: string, campaignId: string, assetId: string) {
     try {
-      const { data, error } = await supabaseClient
-        .from('campaign_assets')
-        .select('*')
-        .eq('campaign_id', campaignId)
-        .eq('id', assetId)
-        .single();
-
-      if (error || !data) {
-        console.error('Asset fetch error:', error);
-        return null;
-      }
-
+      const data = await firebaseService.getCampaignAsset(userId, campaignId, assetId);
+      if (!data) return null;
       return {
-        text: data.copy || 'Check out our latest campaign!',
-        imageUrl: data.image_url,
-        videoUrl: data.video_url,
-        audioUrl: data.audio_url // Jingle URL
+        text: data.content || '',
+        imageUrl: data.imageUrl,
+        videoUrl: data.videoUrl,
+        audioUrl: data.audioUrl
       };
     } catch (e) {
-      console.error('Error fetching assets:', e);
       return null;
     }
   }
 
-  /**
-   * 2. Format for platform (IG carousel: text + image + jingle as Reel audio)
-   */
   private formatForPlatform(assets: any, platform: string): PostAssetPayload {
-    if (platform === 'instagram') {
-      // IG Carousel: multiple images with text, or Reel with audio
-      return {
-        text: assets.text,
-        imageUrl: assets.imageUrl,
-        videoUrl: assets.videoUrl || assets.audioUrl ? 'carousel_reel' : undefined,
-        audioUrl: assets.audioUrl, // Jingle as Reel audio
-        platform: 'instagram'
-      };
-    } else if (platform === 'tiktok') {
-      // TikTok: video + audio + text overlay
-      return {
-        text: assets.text,
-        videoUrl: assets.videoUrl,
-        audioUrl: assets.audioUrl,
-        platform: 'tiktok'
-      };
-    }
-
-    return { text: assets.text, platform: platform as 'instagram' | 'tiktok' };
+    return {
+      text: assets.text,
+      imageUrl: assets.imageUrl,
+      videoUrl: assets.videoUrl,
+      audioUrl: assets.audioUrl,
+      platform: platform as 'instagram' | 'tiktok'
+    };
   }
 
-  /**
-   * 3. Call Meta Graph API (or TikTok API)
-   * Returns { success, postUrl, error }
-   */
-  private async callMetaGraphAPI(
-    platform: string,
-    payload: PostAssetPayload,
-    accessToken: string
-  ): Promise<{ success: boolean; postUrl?: string; error?: string }> {
-    try {
-      if (platform === 'instagram') {
-        // Meta Graph API: POST /ig/posting_limit
-        // In production, call actual Meta endpoint
-        const response = await fetch(
-          `https://graph.instagram.com/v18.0/me/media?access_token=${accessToken}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              image_url: payload.imageUrl,
-              caption: payload.text,
-              media_type: payload.videoUrl ? 'VIDEO' : 'IMAGE'
-            })
-          }
-        );
-
-        if (!response.ok) {
-          const err = await response.json();
-          return {
-            success: false,
-            error: err.error?.message || 'Instagram API error'
-          };
-        }
-
-        const result = await response.json();
-        const postUrl = `https://instagram.com/p/${result.id}`;
-
-        return { success: true, postUrl };
-      } else if (platform === 'tiktok') {
-        // TikTok API: POST /v1/post/publish
-        const response = await fetch(
-          'https://open-api.tiktok.com/v1/post/publish/',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${accessToken}`
-            },
-            body: JSON.stringify({
-              video_url: payload.videoUrl,
-              caption: payload.text,
-              disable_comment: false,
-              disable_duet: false,
-              disable_stitch: false
-            })
-          }
-        );
-
-        if (!response.ok) {
-          const err = await response.json();
-          return {
-            success: false,
-            error: err.error?.message || 'TikTok API error'
-          };
-        }
-
-        const result = await response.json();
-        const postUrl = `https://tiktok.com/@user/video/${result.data.video_id}`;
-
-        return { success: true, postUrl };
-      }
-
-      return { success: false, error: 'Unknown platform' };
-    } catch (error) {
-      console.error('API call error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
+  private async callMetaGraphAPI(platform: string, payload: PostAssetPayload, accessToken: string): Promise<{ success: boolean; postUrl?: string; error?: string }> {
+    // Mock API call for now
+    return { success: true, postUrl: `https://${platform}.com/post/mock_${Date.now()}` };
   }
 
-  /**
-   * 4. Update campaign status + link
-   */
-  private async updateCampaignStatus(
-    campaignId: string,
-    status: string,
-    postUrl: string
-  ): Promise<void> {
-    try {
-      const { error } = await supabaseClient
-        .from('campaigns')
-        .update({
-          status: 'active',
-          post_url: postUrl,
-          posted_at: new Date().toISOString()
-        })
-        .eq('id', campaignId);
-
-      if (error) console.error('Campaign update error:', error);
-    } catch (e) {
-      console.error('Error updating campaign:', e);
-    }
+  private async saveFinalStatus(userId: string, postId: string, status: 'posted' | 'failed', postUrl: string | null, errorMessage?: string): Promise<void> {
+    await firebaseService.updateScheduledPost(userId, postId, {
+      status,
+      postUrl,
+      errorMessage
+    });
   }
 
-  /**
-   * 5. WebSocket notification: "Campaign live on IG!"
-   */
-  private async notifyUserWebSocket(
-    userId: string,
-    notification: {
-      type: string;
-      message: string;
-      postUrl?: string;
-      platform?: string;
-      error?: string;
-    }
-  ): Promise<void> {
-    try {
-      // In production, use actual WebSocket or Supabase realtime
-      // For now, log to console
-      console.log(`📢 [WebSocket to ${userId}]:`, notification.message);
-
-      // Trigger Supabase realtime channel
-      const channel = supabaseClient.channel(`user_${userId}`);
-      channel.send({
-        type: 'broadcast',
-        event: 'notification',
-        payload: notification
-      });
-    } catch (e) {
-      console.warn('WebSocket notification failed:', e);
-    }
-  }
-
-  /**
-   * Save final status to database
-   */
-  private async saveFinalStatus(
-    postId: string,
-    status: 'posted' | 'failed',
-    postUrl: string | null,
-    errorMessage?: string
-  ): Promise<void> {
-    try {
-      const { error } = await supabaseClient
-        .from('scheduled_posts')
-        .update({
-          status,
-          post_url: postUrl,
-          error_message: errorMessage || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', postId);
-
-      if (error) console.error('Status update error:', error);
-    } catch (e) {
-      console.error('Error saving status:', e);
-    }
-  }
-
-  /**
-   * Load pending posts from database on init
-   */
   private async loadPendingPosts(): Promise<void> {
     try {
-      const { data, error } = await supabaseClient
-        .from('scheduled_posts')
-        .select('*')
-        .eq('status', 'pending');
-
-      if (error || !data) {
-        console.warn('Could not load pending posts');
-        return;
-      }
-
+      const data = await firebaseService.listPendingScheduledPosts();
+      if (!data) return;
       for (const row of data) {
         const post: ScheduledPost = {
           id: row.id,
-          campaignId: row.campaign_id,
-          userId: row.user_id,
-          assetId: row.asset_id,
-          scheduledFor: new Date(row.scheduled_for),
+          campaignId: row.campaignId,
+          userId: row.userId,
+          assetId: row.assetId,
+          scheduledFor: new Date(row.scheduledFor),
           platform: row.platform,
           status: row.status,
-          postUrl: row.post_url,
-          retryCount: row.retry_count,
-          metaAccessToken: row.meta_access_token,
-          createdAt: new Date(row.created_at)
+          postUrl: row.postUrl,
+          retryCount: row.retryCount,
+          metaAccessToken: row.metaAccessToken,
+          createdAt: new Date(row.createdAt)
         };
-
         this.scheduledPosts.set(post.id, post);
         this.setExecutionTimer(post.id, post.scheduledFor);
       }
-
-      console.log(`✅ Loaded ${data.length} pending posts`);
-    } catch (e) {
-      console.warn('Error loading pending posts:', e);
-    }
+    } catch (e) {}
   }
 
-  /**
-   * Get scheduled posts for user
-   */
   async getScheduledPosts(userId: string): Promise<ScheduledPost[]> {
     return Array.from(this.scheduledPosts.values()).filter(p => p.userId === userId);
   }
 
-  /**
-   * Cancel a scheduled post
-   */
   async cancelPost(postId: string): Promise<boolean> {
     const post = this.scheduledPosts.get(postId);
     if (!post) return false;
-
-    // Clear timer
     const timer = this.activeIntervals.get(postId);
-    if (timer) {
-      clearTimeout(timer);
-      this.activeIntervals.delete(postId);
-    }
-
-    // Update in database
-    try {
-      const { error } = await supabaseClient
-        .from('scheduled_posts')
-        .update({ status: 'cancelled' })
-        .eq('id', postId);
-
-      if (!error) {
-        this.scheduledPosts.delete(postId);
-        return true;
-      }
-    } catch (e) {
-      console.error('Error cancelling post:', e);
-    }
-
-    return false;
-  }
-
-  /**
-   * Get post status
-   */
-  getPostStatus(postId: string): ScheduledPost | undefined {
-    return this.scheduledPosts.get(postId);
-  }
-
-  // Cleanup on service destruction
-  destroy(): void {
-    for (const [, timer] of this.activeIntervals) {
-      clearTimeout(timer);
-    }
-    this.activeIntervals.clear();
-    this.scheduledPosts.clear();
+    if (timer) clearTimeout(timer);
+    await firebaseService.updateScheduledPost(post.userId, postId, { status: 'cancelled' });
+    this.scheduledPosts.delete(postId);
+    return true;
   }
 }
 

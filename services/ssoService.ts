@@ -14,7 +14,7 @@
 
 import { getSupabase, isSupabaseConfigured } from './supabaseClient';
 
-export type OAuthProvider = 'google' | 'github' | 'microsoft';
+export type OAuthProvider = 'google' | 'github' | 'azure';
 
 export interface SSOConfig {
   provider: OAuthProvider;
@@ -37,8 +37,8 @@ const PROVIDER_CONFIGS: Record<OAuthProvider, SSOConfig> = {
     name: 'GitHub',
     icon: '🐙',
   },
-  microsoft: {
-    provider: 'microsoft',
+  azure: {
+    provider: 'azure',
     enabled: true,
     name: 'Microsoft',
     icon: '🪟',
@@ -206,7 +206,7 @@ class SSOService {
 
       const { error } = await supabase.auth.unlinkIdentity({
         provider,
-      });
+      } as any);
 
       if (error) {
         console.error(`❌ Failed to unlink ${provider}:`, error.message);
@@ -237,8 +237,10 @@ class SSOService {
       if (error || !user) return [];
 
       // Get identities from user metadata
-      const identities = user.identities || [];
-      return identities.map((i) => i.provider as OAuthProvider).filter((p) => p !== 'email');
+      const identities = (user.identities || []) as any[];
+      return (identities as any[])
+        .map((i) => i.provider as string)
+        .filter((p: any): p is OAuthProvider => ['google', 'github', 'azure'].includes(p));
     } catch (error) {
       console.error('❌ Failed to get linked providers:', error);
       return [];

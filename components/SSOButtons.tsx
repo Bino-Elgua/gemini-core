@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { ssoService, OAuthProvider } from '../services/ssoService';
+import { ssoService, OAuthProvider, SSOConfig } from '../services/ssoService';
 
 interface SSOButtonsProps {
   onSignIn?: (provider: OAuthProvider) => void;
@@ -14,7 +14,7 @@ interface SSOButtonsProps {
 }
 
 export function SSOButtons({ onSignIn, compact = false }: SSOButtonsProps) {
-  const [providers, setProviders] = useState<typeof ssoService.getAvailableProviders()>([]);
+  const [providers, setProviders] = useState<SSOConfig[]>([]);
   const [loading, setLoading] = useState<OAuthProvider | null>(null);
 
   useEffect(() => {
@@ -22,12 +22,12 @@ export function SSOButtons({ onSignIn, compact = false }: SSOButtonsProps) {
     setProviders(available);
   }, []);
 
-  async function handleSignIn(provider: OAuthProvider) {
-    setLoading(provider);
+  async function handleSignIn(providerId: OAuthProvider) {
+    setLoading(providerId);
     try {
-      const success = await ssoService.signInWithProvider(provider);
+      const success = await ssoService.signInWithProvider(providerId);
       if (success && onSignIn) {
-        onSignIn(provider);
+        onSignIn(providerId);
       }
     } finally {
       setLoading(null);
@@ -79,7 +79,7 @@ interface LinkProviderProps {
 }
 
 export function LinkProvider({ onLinked, onError }: LinkProviderProps) {
-  const [providers, setProviders] = useState<typeof ssoService.getAvailableProviders()>([]);
+  const [providers, setProviders] = useState<SSOConfig[]>([]);
   const [linked, setLinked] = useState<OAuthProvider[]>([]);
   const [loading, setLoading] = useState<OAuthProvider | null>(null);
 
@@ -88,34 +88,34 @@ export function LinkProvider({ onLinked, onError }: LinkProviderProps) {
     setProviders(available);
 
     // Load linked providers
-    ssoService.getLinkedProviders().then(setLinked).catch((err) => {
+    ssoService.getLinkedProviders().then(setLinked).catch((err: { message: string }) => {
       if (onError) onError(err.message);
     });
   }, [onError]);
 
-  async function handleLink(provider: OAuthProvider) {
-    setLoading(provider);
+  async function handleLink(providerId: OAuthProvider) {
+    setLoading(providerId);
     try {
-      const success = await ssoService.linkProvider(provider);
+      const success = await ssoService.linkProvider(providerId);
       if (success) {
-        setLinked((prev) => [...prev, provider]);
-        if (onLinked) onLinked(provider);
+        setLinked((prev) => [...prev, providerId]);
+        if (onLinked) onLinked(providerId);
       } else {
-        if (onError) onError(`Failed to link ${provider}`);
+        if (onError) onError(`Failed to link ${providerId}`);
       }
     } finally {
       setLoading(null);
     }
   }
 
-  async function handleUnlink(provider: OAuthProvider) {
-    setLoading(provider);
+  async function handleUnlink(providerId: OAuthProvider) {
+    setLoading(providerId);
     try {
-      const success = await ssoService.unlinkProvider(provider);
+      const success = await ssoService.unlinkProvider(providerId);
       if (success) {
-        setLinked((prev) => prev.filter((p) => p !== provider));
+        setLinked((prev) => prev.filter((p) => p !== providerId));
       } else {
-        if (onError) onError(`Failed to unlink ${provider}`);
+        if (onError) onError(`Failed to unlink ${providerId}`);
       }
     } finally {
       setLoading(null);

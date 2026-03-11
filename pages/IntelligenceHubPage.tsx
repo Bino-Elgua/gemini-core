@@ -43,13 +43,13 @@ export default function IntelligenceHubPage() {
     e.preventDefault();
 
     if (!sector.trim()) {
-      toastService.error('Please enter a sector');
+      toastService.error('Missing Input', 'Please enter a sector');
       return;
     }
 
     // Check API health
     if (!apiStatus.healthy) {
-      toastService.error('Google API not ready. Please check your API key.');
+      toastService.error('API Error', 'Google API not ready. Please check your API key.');
       return;
     }
 
@@ -60,7 +60,7 @@ export default function IntelligenceHubPage() {
     );
 
     if (!hasSufficientCredits) {
-      toastService.error('Insufficient credits. Upgrade to Pro or wait for daily reset.');
+      toastService.error('Credits', 'Insufficient credits. Upgrade to Pro or wait for daily reset.');
       return;
     }
 
@@ -69,7 +69,7 @@ export default function IntelligenceHubPage() {
     try {
       // If sector is vague, prompt user
       if (['services', 'business', 'company'].includes(sector.toLowerCase())) {
-        toastService.info(`Please clarify: "services" is too broad. Try "barbershop", "plumbing", "fitness coaching", etc.`);
+        toastService.info('Clarification Needed', `Please clarify: "services" is too broad. Try "barbershop", "plumbing", "fitness coaching", etc.`);
         setLoading(false);
         return;
       }
@@ -77,11 +77,11 @@ export default function IntelligenceHubPage() {
       const result = await geminiService.extractDNA(sector, context || '');
 
       if (result.niche.includes('Specify niche')) {
-        toastService.warning('Please be more specific with your sector. Example: "yoga studio" instead of "fitness"');
+        toastService.warning('Be More Specific', 'Please be more specific with your sector. Example: "yoga studio" instead of "fitness"');
         setDnaResult(result);
       } else {
         setDnaResult(result);
-        toastService.success('🧬 DNA extracted successfully');
+        toastService.success('Success', '🧬 DNA extracted successfully');
       }
 
       // Update credits
@@ -92,7 +92,7 @@ export default function IntelligenceHubPage() {
       }));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Extraction failed';
-      toastService.error(message);
+      toastService.error('Extraction Failed', message);
 
       if (message.includes('API key')) {
         setApiStatus({ healthy: false, message: '❌ Invalid API key' });

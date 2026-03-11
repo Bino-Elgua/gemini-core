@@ -3,6 +3,7 @@ export interface BrandDNA {
   id: string;
   name: string;
   url: string;
+  description: string;
   extractedAt: string;
   confidenceScore: number;
   tagline: string;
@@ -85,6 +86,8 @@ export interface ChannelStrategy {
 export interface CampaignOverview {
   name: string;
   goal: string;
+  budget: string;
+  duration: string;
   audienceSegment: string;
   timeline: string;
   constraints: string[];
@@ -103,6 +106,13 @@ export interface UserStory {
 }
 
 export interface CampaignPRD {
+  title: string;
+  objectives: string[];
+  channels: string[];
+  timeline: string[];
+  kpis: string[];
+  contentPillars: string[];
+  assets: any[];
   overview: CampaignOverview;
   channelStrategies: ChannelStrategy[];
   userStories: UserStory[];
@@ -223,7 +233,7 @@ export interface SessionUser {
   name: string;
   avatar: string;
   role: 'admin' | 'editor' | 'viewer';
-  status: 'online' | 'away' | 'busy';
+  status: 'online' | 'away' | 'busy' | 'offline';
   color: string;
 }
 

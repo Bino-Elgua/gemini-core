@@ -38,7 +38,7 @@ export default function CampaignForgeGooglePage() {
   // Generate campaign from DNA
   const handleGenerateCampaign = async () => {
     if (!dnaFromStorage) {
-      toastService.error('Please extract DNA first');
+      toastService.error('Error', 'Please extract DNA first');
       return;
     }
 
@@ -55,9 +55,9 @@ export default function CampaignForgeGooglePage() {
         usedToday: prev.usedToday + 30,
       }));
 
-      toastService.success('Campaign generated!');
+      toastService.success('Success', 'Campaign generated!');
     } catch (error) {
-      toastService.error('Campaign generation failed');
+      toastService.error('Error', 'Campaign generation failed');
     } finally {
       setLoading(false);
     }
@@ -68,24 +68,24 @@ export default function CampaignForgeGooglePage() {
     e.preventDefault();
 
     if (!campaign) {
-      toastService.error('Generate a campaign first');
+      toastService.error('Error', 'Generate a campaign first');
       return;
     }
 
     if (!scheduledDate || !scheduledTime) {
-      toastService.error('Please select date and time');
+      toastService.error('Error', 'Please select date and time');
       return;
     }
 
     if (selectedPlatforms.length === 0) {
-      toastService.error('Select at least one platform');
+      toastService.error('Error', 'Select at least one platform');
       return;
     }
 
     // Check credits
     const cost = creditSystemService.getCost('autoPost');
     if (credits.remaining < cost) {
-      toastService.error(`Need ${cost} credits to schedule post (${credits.remaining} remaining)`);
+      toastService.error('Credits', `Need ${cost} credits to schedule post (${credits.remaining} remaining)`);
       return;
     }
 
@@ -114,9 +114,9 @@ export default function CampaignForgeGooglePage() {
           );
 
           if (data.status === 'posted') {
-            toastService.success('✅ Post published!');
+            toastService.success('Published', '✅ Post published!');
           } else if (data.status === 'failed') {
-            toastService.error(`❌ Post failed: ${data.error}`);
+            toastService.error('Failed', `❌ Post failed: ${data.error}`);
           }
         }
       });
@@ -138,13 +138,13 @@ export default function CampaignForgeGooglePage() {
         usedToday: prev.usedToday + cost,
       }));
 
-      toastService.success('📅 Post scheduled! Will post at ' + scheduledDateTime.toLocaleTimeString());
+      toastService.success('Scheduled', '📅 Post scheduled! Will post at ' + scheduledDateTime.toLocaleTimeString());
 
       // Clear form
       setScheduledDate('');
       setScheduledTime('10:00');
     } catch (error) {
-      toastService.error('Failed to schedule post');
+      toastService.error('Error', 'Failed to schedule post');
     }
   };
 

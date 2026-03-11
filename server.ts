@@ -214,9 +214,7 @@ app.get('/api/costs/summary', async (request, reply) => {
     data: {
       totalCost: 156.78,
       costByProvider: {
-        openai: 45.20,
-        'stability-ultra': 78.90,
-        'google-veo': 32.68
+        gemini: 156.78
       },
       costByOperation: {
         text_generation: 45.20,
@@ -258,17 +256,13 @@ app.get('/api/providers/status', async (request, reply) => {
     success: true,
     data: {
       llm: [
-        { name: 'gemini', status: 'healthy', successRate: 99.8, avgResponse: 150 },
-        { name: 'openai', status: 'healthy', successRate: 99.7, avgResponse: 245 },
-        { name: 'anthropic', status: 'healthy', successRate: 99.5, avgResponse: 320 }
+        { name: 'gemini', status: 'healthy', successRate: 99.8, avgResponse: 150 }
       ],
       image: [
-        { name: 'stability-ultra', status: 'healthy', successRate: 99.9, avgResponse: 2000 },
-        { name: 'dalle-4', status: 'healthy', successRate: 99.8, avgResponse: 3000 }
+        { name: 'google-imagen', status: 'healthy', successRate: 99.9, avgResponse: 2000 }
       ],
       video: [
-        { name: 'google-veo', status: 'healthy', successRate: 99.2, avgResponse: 'queued' },
-        { name: 'sora', status: 'healthy', successRate: 99.1, avgResponse: 'queued' }
+        { name: 'google-veo', status: 'healthy', successRate: 99.2, avgResponse: 'queued' }
       ]
     }
   };
@@ -288,7 +282,7 @@ app.get('/api/settings', async (request, reply) => {
       },
       providers: {
         activeLLM: 'gemini',
-        activeImage: 'stability-ultra',
+        activeImage: 'google-imagen',
         activeVideo: 'google-veo'
       },
       notifications: {
@@ -315,7 +309,7 @@ app.put('/api/settings', async (request, reply) => {
 /**
  * Error handler
  */
-app.setErrorHandler((error, request, reply) => {
+app.setErrorHandler((error: any, request, reply) => {
   console.error('API Error:', error);
 
   if (error.statusCode === 400) {

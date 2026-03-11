@@ -35,7 +35,11 @@ const LiveSessionPage = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setActiveUsers(collaborationService.getInitialUsers?.() || []);
+    const fetchInitialUsers = async () => {
+      const users = await collaborationService.getInitialUsers?.();
+      if (users) setActiveUsers(users);
+    };
+    fetchInitialUsers();
     if (currentBrand) setMission(currentBrand.mission);
 
     const unsubscribe = collaborationService.subscribe((type, data) => {

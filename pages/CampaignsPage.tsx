@@ -333,6 +333,8 @@ export default function CampaignsPage() {
   const [overview, setOverview] = useState<CampaignOverview>({
     name: '',
     goal: 'Brand Awareness',
+    budget: '$1,000',
+    duration: '30',
     audienceSegment: currentBrand?.targetAudience[0] || 'General',
     timeline: '7 Days',
     constraints: []
@@ -680,7 +682,7 @@ export default function CampaignsPage() {
                 </div>
                 <div className="mt-auto flex justify-between items-center">
                    <span className="text-[10px] text-zinc-600 uppercase font-black tracking-widest">{new Date(c.createdAt).toLocaleDateString()}</span>
-                   <button onClick={() => { setGeneratedAssets(c.assets); setOverview({ name: c.name, goal: c.goal, audienceSegment: '', timeline: '', constraints: [] }); setStep(4); setView('forge'); }} className="text-brand-500 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 hover:text-white transition-colors">Inspect <Eye className="w-4 h-4" /></button>
+                   <button onClick={() => { setGeneratedAssets(c.assets); setOverview({ name: c.name, goal: c.goal, budget: '$1,000', duration: '30', audienceSegment: '', timeline: '', constraints: [] }); setStep(4); setView('forge'); }} className="text-brand-500 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 hover:text-white transition-colors">Inspect <Eye className="w-4 h-4" /></button>
                 </div>
              </div>
            )) : (

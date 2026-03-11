@@ -67,7 +67,7 @@ class DataFlowService {
   private runs: Map<string, PipelineRun> = new Map();
   private validators: Map<string, DataValidationRule[]> = new Map();
   private transformers: Map<string, DataTransformer> = new Map();
-  private scheduledJobs: Map<string, NodeJS.Timer> = new Map();
+  private scheduledJobs: Map<string, ReturnType<typeof setInterval>> = new Map();
 
   async initialize(): Promise<void> {
     this.setupDefaultTransformers();

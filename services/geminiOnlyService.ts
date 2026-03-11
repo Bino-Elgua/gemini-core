@@ -4,7 +4,7 @@
  * Handles: DNA extraction, campaign generation, website building, agent chat
  */
 
-import { GoogleGenerativeAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 interface GeminiConfig {
   apiKey: string;

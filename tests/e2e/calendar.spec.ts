@@ -118,8 +118,8 @@ test.describe('Calendar + Auto-Post Workflow', () => {
     let notificationText = '';
 
     page.on('websocket', ws => {
-      ws.on('frameSent', frame => {
-        const message = JSON.stringify(frame);
+      ws.on('framesent', (frame: any) => {
+        const message = typeof frame === 'string' ? frame : JSON.stringify(frame);
         if (message.includes('campaign_posted') || message.includes('Campaign live on')) {
           notificationReceived = true;
           notificationText = message;

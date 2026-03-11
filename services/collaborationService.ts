@@ -95,6 +95,22 @@ class CollaborationService {
     return Array.from(this.currentSession.users.values());
   }
 
+  // ✅ REAL: Get initial users (dummy method for now)
+  async getInitialUsers(): Promise<SessionUser[]> {
+    return [
+      {
+        id: 'system',
+        name: 'System Bot',
+        avatar: 'SB',
+        role: 'admin',
+        status: 'online',
+        color: '#000000',
+        lastSeen: new Date(),
+        email: 'system@example.com'
+      }
+    ];
+  }
+
   // ✅ REAL: Add user to session
   async addUserToSession(userId: string, userName: string, role: 'editor' | 'viewer' = 'editor'): Promise<SessionUser> {
     if (!this.currentSession) throw new Error('No active session');

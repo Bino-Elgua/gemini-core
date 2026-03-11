@@ -243,6 +243,21 @@ class SonicService {
     return Array.from(this.voiceProfiles.values());
   }
 
+  async generateVoiceProfile(name: string, provider: VoiceProfile['provider']): Promise<VoiceProfile> {
+    const profile: VoiceProfile = {
+      id: `voice_${Date.now()}`,
+      name,
+      voiceId: `voice_id_${Math.random().toString(36).substring(7)}`,
+      provider,
+      language: 'en-US',
+      gender: 'neutral',
+      accent: 'Neutral',
+      style: 'Default'
+    };
+    this.voiceProfiles.set(profile.id, profile);
+    return profile;
+  }
+
   async getGeneration(generationId: string): Promise<SonicGeneration | null> {
     return this.generations.get(generationId) || null;
   }

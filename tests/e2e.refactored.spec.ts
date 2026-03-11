@@ -240,14 +240,14 @@ test.describe('Full-Core E2E Tests (Refactored)', () => {
     await page.click('button:has-text("Upgrade to Pro")');
     
     // Should show Stripe checkout (or modal)
-    await expect(page.locator('text=stripe|checkout|payment', { ignoreCase: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=/stripe|checkout|payment/i')).toBeVisible({ timeout: 5000 });
     
     // 5. Test credit pack buttons
     await page.goto(`${baseUrl}/dashboard`);
     await page.click('text=$4.99 for 500 credits');
     
     // Should trigger payment flow
-    await expect(page.locator('text=stripe|checkout|payment', { ignoreCase: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=/stripe|checkout|payment/i')).toBeVisible({ timeout: 5000 });
     
     console.log('✅ Subscriptions workflow complete');
   });
@@ -263,7 +263,7 @@ test.describe('Full-Core E2E Tests (Refactored)', () => {
     await extractBtn.click(); // Rapid click
     
     // Should show debounce message
-    await expect(page.locator('text=wait|debounce', { ignoreCase: true })).toBeVisible();
+    await expect(page.locator('text=/wait|debounce/i')).toBeVisible();
     
     // Test 2: Mobile responsive calendar
     await page.setViewportSize({ width: 375, height: 667 }); // iPhone

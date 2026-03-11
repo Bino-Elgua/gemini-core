@@ -57,7 +57,7 @@ class LiveSessionsService {
       // Load initial messages from Firebase
       const messages = await firebaseService.getSessionMessages(sessionId);
       if (messages) {
-        this.sessionChats.set(sessionId, messages);
+        this.sessionChats.set(sessionId, messages as ChatMessage[]);
       }
 
       // Set up real-time listener via Firebase
@@ -140,7 +140,7 @@ class LiveSessionsService {
       await firebaseService.setUserTyping(sessionId, userId, isTyping);
 
       // Update local presence
-      const presence = this.userPresence.get(userId) || { userId, isTyping: false, lastSeen: Date.now() };
+      const presence = this.userPresence.get(userId) || { userId, username: 'Unknown', isTyping: false, lastSeen: Date.now() };
       presence.isTyping = isTyping;
       presence.typingSince = isTyping ? Date.now() : undefined;
       this.userPresence.set(userId, presence);
@@ -168,7 +168,7 @@ class LiveSessionsService {
   async getTypingUsers(sessionId: string): Promise<UserPresence[]> {
     try {
       const typingUsers = await firebaseService.getTypingUsers(sessionId);
-      return typingUsers || [];
+      return (typingUsers as UserPresence[]) || [];
     } catch (error) {
       console.warn('⚠️ Failed to get typing users:', error);
       return [];
@@ -238,7 +238,7 @@ class LiveSessionsService {
    */
   async getPendingInvites(userEmail: string): Promise<TeamInvite[]> {
     try {
-      return await firebaseService.getPendingInvites(userEmail);
+      return (await firebaseService.getPendingInvites(userEmail)) as TeamInvite[];
     } catch (error) {
       console.warn('⚠️ Failed to get invites:', error);
       return [];

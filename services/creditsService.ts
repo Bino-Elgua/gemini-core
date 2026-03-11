@@ -106,6 +106,29 @@ class CreditsService {
     return await firebaseService.deductCredits(this.userId, cost, operation);
   }
 
+  async deduct(userId: string, amount: number, metadata: string | Record<string, any>): Promise<{ success: boolean; error?: string }> {
+    const reason = typeof metadata === 'string' ? metadata : JSON.stringify(metadata);
+    console.log(`Deducting ${amount} credits from user ${userId} for: ${reason}`);
+    
+    // Check balance first
+    const balance = await firebaseService.getCreditsBalance(userId);
+    if (balance < amount) {
+      return { success: false, error: 'Insufficient credits' };
+    }
+
+    // Call firebaseService for actual deduction
+    const success = await firebaseService.deductCredits(userId, amount, reason);
+    return { success, error: success ? undefined : 'Deduction failed in Firebase' };
+  }
+
+  async refund(userId: string, amount: number, metadata: string | Record<string, any>): Promise<{ success: boolean; error?: string }> {
+    const reason = typeof metadata === 'string' ? metadata : JSON.stringify(metadata);
+    console.log(`Refunding ${amount} credits to user ${userId} for: ${reason}`);
+    
+    await firebaseService.addCredits(userId, amount, `refund: ${reason}`);
+    return { success: true };
+  }
+
   async canAffordOperation(operation: string): Promise<boolean> {
     const cost = this.getOperationCost(operation);
     const balance = await firebaseService.getCreditsBalance(this.userId);

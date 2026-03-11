@@ -87,6 +87,13 @@ export const generateAdvancedPRD = async (
     }));
 
     return {
+      title: stringifyValue(raw.title || `${brand.name} Campaign Strategy`),
+      objectives: ensureArray(raw, 'objectives').map(o => stringifyValue(o)),
+      channels: channels.map(c => stringifyValue(c)),
+      timeline: ensureArray(raw, 'timeline').map((t: any) => stringifyValue(t)),
+      kpis: ensureArray(raw, 'kpis').map(k => stringifyValue(k)),
+      contentPillars: ensureArray(raw, 'contentPillars').map(p => stringifyValue(p)),
+      assets: [],
       overview,
       channelStrategies: ensureArray(raw, 'channelStrategies'),
       sequencingPlan: stringifyValue(raw.sequencingPlan || "Sequence active."),

@@ -24,14 +24,14 @@ export default function WebsiteBuilderGooglePage() {
   // Generate website from DNA
   const handleGenerateWebsite = async () => {
     if (!dnaFromStorage) {
-      toastService.error('Please extract DNA first');
+      toastService.error('Missing DNA', 'Please extract DNA first');
       return;
     }
 
     // Check credits
     const cost = creditSystemService.getCost('websiteGeneration');
     if (credits.remaining < cost) {
-      toastService.error(`Need ${cost} credits (${credits.remaining} remaining)`);
+      toastService.error('Credits', `Need ${cost} credits (${credits.remaining} remaining)`);
       return;
     }
 
@@ -53,9 +53,9 @@ export default function WebsiteBuilderGooglePage() {
         usedToday: prev.usedToday + cost,
       }));
 
-      toastService.success('✨ Website generated! One-click ready.');
+      toastService.success('Success', '✨ Website generated! One-click ready.');
     } catch (error) {
-      toastService.error('Website generation failed. Check your API key.');
+      toastService.error('Error', 'Website generation failed. Check your API key.');
     } finally {
       setLoading(false);
     }
@@ -91,9 +91,9 @@ export default function WebsiteBuilderGooglePage() {
       link.click();
       URL.revokeObjectURL(url);
 
-      toastService.success('📦 Website downloaded as ZIP');
+      toastService.success('Success', '📦 Website downloaded as ZIP');
     } catch (error) {
-      toastService.error('Download failed');
+      toastService.error('Error', 'Download failed');
     }
   };
 

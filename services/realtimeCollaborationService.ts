@@ -31,7 +31,7 @@ class RealtimeCollaborationService {
     const session = this.sessions.get(sessionId) || await hybridStorage.get(`collab-session-${sessionId}`);
     if (!session) throw new Error('Session not found');
 
-    const existingParticipant = session.participants.find(p => p.userId === userId);
+    const existingParticipant = session.participants.find((p: any) => p.userId === userId);
     if (!existingParticipant) {
       session.participants.push({
         userId,

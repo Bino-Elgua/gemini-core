@@ -235,11 +235,11 @@ class PricingServiceExpanded {
       }
 
       // Create one-time charge
-      const result = await stripeService.createCharge(userId, {
-        amount: pack.price * 100,
-        description: `Credit pack: ${pack.credits} credits`,
-        metadata: { packId, credits: pack.credits }
-      });
+      const result = await stripeService.createCharge(
+        userId, 
+        pack.price * 100, 
+        `Credit pack: ${pack.credits} credits`
+      );
 
       if (result.success) {
         // Add credits to user account

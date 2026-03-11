@@ -245,7 +245,7 @@ class BatchProcessingService {
     for (const item of chunk) {
       try {
         // Simulate processing
-        const processedItem = { ...item, _processedAt: new Date(), _chunkIndex: chunkIndex };
+        const processedItem = { ...(item as any), _processedAt: new Date(), _chunkIndex: chunkIndex };
         results.push(processedItem);
         processed++;
       } catch {

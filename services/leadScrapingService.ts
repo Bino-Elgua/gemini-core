@@ -330,8 +330,8 @@ class LeadScrapingService {
       if (filters.source) {
         filtered = filtered.filter(l => l.source === filters.source);
       }
-      if (filters.minConfidence) {
-        filtered = filtered.filter(l => l.confidence >= filters.minConfidence);
+      if (filters.minConfidence !== undefined) {
+        filtered = filtered.filter(l => l.confidence >= (filters.minConfidence as number));
       }
       if (filters.verificationStatus) {
         filtered = filtered.filter(l => l.verificationStatus === filters.verificationStatus);

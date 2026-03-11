@@ -4,9 +4,9 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { firebaseService } from '../services/firebaseService';
-import { stripeService } from '../services/stripeService';
-import { pricingService } from '../services/pricingService';
+import { firebaseService } from '../../services/firebaseService';
+import { stripeService, CreditPack } from '../../services/stripeService';
+import { pricingService } from '../../services/pricingService';
 import { TrendingDown, Zap, ShoppingCart, AlertTriangle } from 'lucide-react';
 
 interface CreditsWalletProps {
@@ -24,9 +24,17 @@ interface WalletData {
   status: 'healthy' | 'warning' | 'critical';
 }
 
+interface UsageLogEntry {
+  id: string;
+  type: string;
+  amount: number;
+  timestamp: string;
+  feature: string;
+}
+
 export const CreditsWallet: React.FC<CreditsWalletProps> = ({ userId, onBuyCredits }) => {
   const [wallet, setWallet] = useState<WalletData | null>(null);
-  const [usageLog, setUsageLog] = useState<any[]>([]);
+  const [usageLog, setUsageLog] = useState<UsageLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -145,7 +153,7 @@ export const CreditsWallet: React.FC<CreditsWalletProps> = ({ userId, onBuyCredi
       <div className="mb-6">
         <p className="text-sm text-zinc-300 font-semibold mb-3">Buy Credits</p>
         <div className="grid grid-cols-2 gap-2">
-          {creditPacks.map((pack) => (
+          {creditPacks.map((pack: CreditPack) => (
             <button
               key={pack.id}
               onClick={() => onBuyCredits?.()}
