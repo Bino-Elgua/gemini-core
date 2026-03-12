@@ -8,6 +8,7 @@ import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
+import helmet from '@fastify/helmet';
 
 const app = Fastify({
   logger: false, // Turn off for stress test to avoid log bloat
@@ -22,6 +23,19 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-productio
 /**
  * Register plugins
  */
+await app.register(helmet, {
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https://via.placeholder.com", "https://*.googleusercontent.com"],
+      connectSrc: ["'self'", "wss:", "https://*.firebaseio.com", "https://*.supabase.co", "https://*.googleapis.com"]
+    }
+  }
+});
+
 await app.register(cors, {
   origin: process.env.CORS_ORIGIN || ['http://localhost:3001', 'http://localhost:3000'],
   credentials: true
