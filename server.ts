@@ -7,14 +7,15 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
+import websocket from '@fastify/websocket';
 
 const app = Fastify({
-  logger: true,
+  logger: false, // Turn off for stress test to avoid log bloat
   trustProxy: true
 });
 
 // Environment
-const PORT = parseInt(process.env.API_PORT || '4000', 10);
+const PORT = parseInt(process.env.API_PORT || '4999', 10);
 const HOST = process.env.API_HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-production';
 
@@ -31,8 +32,43 @@ await app.register(jwt, {
 });
 
 await app.register(rateLimit, {
-  max: 100,
-  timeWindow: '15 minutes'
+  max: 1000, // Increased for stress testing
+  timeWindow: '1 minute'
+});
+
+await app.register(websocket);
+
+// Session tracking for WebSocket broadcast
+const activeSessions = new Map<string, Set<any>>();
+
+app.get('/ws', { websocket: true }, (connection, req) => {
+  connection.socket.on('message', message => {
+    // Pure broadcast for stress test performance
+    const payload = message.toString();
+    for (const [sessionId, participants] of activeSessions) {
+      for (const socket of participants) {
+        if (socket !== connection.socket && socket.readyState === 1) {
+          socket.send(payload);
+        }
+      }
+    }
+
+    // Handle join
+    try {
+      const data = JSON.parse(payload);
+      if (data.type === 'join') {
+        if (!activeSessions.has(data.sessionId)) activeSessions.set(data.sessionId, new Set());
+        activeSessions.get(data.sessionId)!.add(connection.socket);
+        connection.socket.send(JSON.stringify({ type: 'joined' }));
+      }
+    } catch (e) {}
+  });
+
+  connection.socket.on('close', () => {
+    for (const participants of activeSessions.values()) {
+      participants.delete(connection.socket);
+    }
+  });
 });
 
 /**

@@ -1,0 +1,19 @@
+{
+  "config": {
+    "CONCURRENT_CLIENTS": 500,
+    "TEST_DURATION_MS": 30000,
+    "MESSAGE_INTERVAL_MS": 5000,
+    "WS_URL": "ws://localhost:5000",
+    "SESSION_ID": "stress-test-room-001"
+  },
+  "summary": {
+    "totalConnections": 500,
+    "totalMessagesSent": 2249,
+    "totalMessagesReceived": 980118,
+    "successRate": "87.34",
+    "p50Latency": 3227,
+    "p95Latency": 10458,
+    "p99Latency": 11730,
+    "totalErrors": 0
+  }
+}

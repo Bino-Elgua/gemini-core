@@ -19,6 +19,7 @@
     "@fastify/cors": "^10.1.0",
     "@fastify/jwt": "^10.0.0",
     "@fastify/rate-limit": "^10.3.0",
+    "@fastify/websocket": "^11.2.0",
     "@google/genai": "^1.35.0",
     "@google/generative-ai": "^0.24.1",
     "@sentry/react": "^10.38.0",
@@ -35,6 +36,8 @@
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.12.0",
     "recharts": "^3.6.0",
+    "uuid": "^13.0.0",
+    "ws": "^8.19.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.10"
   },

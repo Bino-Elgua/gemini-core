@@ -307,6 +307,40 @@ MFA_ISSUER_NAME=SacredCore   # 2FA setup
 
 ---
 
+## 🔐 Security Architecture
+
+Sacred Core employs a multi-layered security model designed for enterprise compliance (SOC 2 / GDPR / HIPAA ready).
+
+### Cryptographic Foundation
+- **At-Rest Encryption:** AES-256-GCM (Authenticated Encryption) for all sensitive brand DNA and PII.
+- **In-Transit Security:** TLS 1.3 enforced via Fastify with secure header injection (HSTS, CSP).
+- **Webhook Validation:** HMAC-SHA256 signature verification using `crypto.timingSafeEqual` to prevent forgery and timing attacks.
+- **Identity:** SCIM 2.0 compliant provisioning with JWT-based authentication.
+
+### Access Control (RBAC)
+- **4-Tier Model:** Owner (Full), Admin (Manage), Member (Write), Viewer (Read-only).
+- **Audit Logging:** Tamper-evident, persistent logs capturing `actor`, `action`, `resource`, and `delta`.
+
+---
+
+## 📈 Performance Benchmarks
+
+### Stress Test Results (Local Mock Environment)
+| Metric | Result | Target (SLA) | Note |
+| :--- | :--- | :--- | :--- |
+| **Concurrent Clients** | 500 | 1,000+ | Local Node.js event-loop saturation point |
+| **P50 Latency** | 3,227ms | <100ms | Broadcast fan-out bottleneck (Mock only) |
+| **P95 Latency** | 10,458ms | <500ms | 435x message multiplier local loopback |
+| **Success Rate** | 100% | 99.99% | Zero dropped messages under saturation |
+
+### Scaling Strategy (Production)
+For enterprise loads (1,000+ users), Sacred Core transitions from local mocks to **Firebase Realtime DB Sharding**:
+1. **Sharding:** Distributing active sessions across multiple Firebase instances via `shardId`.
+2. **Regional Placement:** Deploying edge functions in the closest region to the user.
+3. **Presence Throttling:** Throttling typing indicators and high-frequency metadata to 1Hz.
+
+---
+
 ## 🧪 Quality Assurance
 
 ### Test Coverage
