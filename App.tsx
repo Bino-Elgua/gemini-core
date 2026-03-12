@@ -4,6 +4,8 @@ import { Layout } from './components/Layout';
 import { hybridStorage } from './services/hybridStorageService';
 import { initSupabase, checkConnection } from './services/supabaseClient';
 import { sentryService, SentryErrorBoundary } from './services/sentryService';
+import { configValidator } from './services/configValidator';
+import { errorHandlingService } from './services/errorHandlingService';
 
 // Week 3 Services - Initialize all
 import { sonicCoPilot } from './services/sonicCoPilot';
@@ -36,26 +38,36 @@ export default function App() {
     const initializeApp = async () => {
       console.log('🚀 Initializing Sacred Core...');
       
+      // 1. Validate Configuration First
+      const configResult = configValidator.validate();
+      if (!configResult.valid && import.meta.env.PROD) {
+        console.error('🛑 System halt: Critical configuration missing');
+        return;
+      }
+
       try {
-        // Initialize Sentry for error tracking (first, before other services)
+        // 2. Initialize Sentry & Error Handling
         sentryService.initialize();
         
-        // Initialize Supabase (graceful fail if not configured)
-        initSupabase();
-        
-        // Initialize hybrid storage
-        await hybridStorage.initialize();
-        
-        // Initialize Week 3 Services
-        console.log('⚡ Initializing Week 3 features...');
-        
-        await Promise.all([
-          sonicCoPilot.initialize?.(),
-          battleModeService.initialize?.(),
-          sonicService.initialize?.(),
-          ampCLIService.initialize?.(),
-          imageGenerationService.initialize?.()
-        ]).catch(err => console.warn('⚠️ Week 3 service initialization had issues:', err));
+        // 3. Retryable Initialization Logic
+        await errorHandlingService.withRetry(async () => {
+          // Initialize Supabase (graceful fail if not configured)
+          initSupabase();
+          
+          // Initialize hybrid storage
+          await hybridStorage.initialize();
+          
+          // Initialize Week 3 Services
+          console.log('⚡ Initializing Week 3 features...');
+          
+          await Promise.all([
+            sonicCoPilot.initialize?.(),
+            battleModeService.initialize?.(),
+            sonicService.initialize?.(),
+            ampCLIService.initialize?.(),
+            imageGenerationService.initialize?.()
+          ]);
+        }, { maxRetries: 3, context: 'app_initialization' });
         
         // Store services in window for CLI access
         (window as any).__SACRED_CORE__ = {
@@ -63,10 +75,12 @@ export default function App() {
           battleModeService,
           sonicService,
           ampCLIService,
-          imageGenerationService
+          imageGenerationService,
+          configValidator,
+          errorHandlingService
         };
         
-        console.log('✅ All Week 3 services initialized');
+        console.log('✅ All services initialized successfully');
         
         // Check Supabase connection
         const isConnected = await checkConnection();
@@ -77,7 +91,7 @@ export default function App() {
         }
       } catch (error) {
         console.warn('⚠️ Initialization error (running in fallback mode):', error);
-        sentryService.captureException(error, { context: 'app_initialization' });
+        errorHandlingService.handleError(error, 'app_initialization');
       }
     };
 

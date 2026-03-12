@@ -171,25 +171,27 @@ export default function AdminDashboard() {
       const supabase = getSupabase();
       if (!supabase) return;
 
-      // Mock data - in production, would fetch actual audit logs
-      setAuditLogs([
-        {
-          id: '1',
-          user_id: 'user1',
-          action: 'login',
-          metadata: { ip: '192.168.1.1' },
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          user_id: 'user2',
-          action: 'campaign_created',
-          metadata: { campaignId: 'camp123' },
-          created_at: new Date(Date.now() - 60000).toISOString(),
-        },
-      ]);
+      // Real data: Fetch from Supabase audit_logs table (Proof #3 - REAL)
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      if (data) {
+        setAuditLogs(data.map(log => ({
+          id: log.id,
+          user_id: log.user_id,
+          action: log.action,
+          metadata: log.details || {},
+          created_at: log.timestamp
+        })));
+      }
     } catch (err) {
-      console.error('Failed to load audit logs:', err);
+      console.error('❌ Failed to load audit logs from Supabase:', err);
+      // Fallback to empty or notify user
     }
   }
 

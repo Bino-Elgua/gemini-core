@@ -1,19 +1,24 @@
 {
   "config": {
-    "CONCURRENT_CLIENTS": 500,
-    "TEST_DURATION_MS": 30000,
-    "MESSAGE_INTERVAL_MS": 5000,
-    "WS_URL": "ws://localhost:5000",
-    "SESSION_ID": "stress-test-room-001"
+    "CONCURRENT_CLIENTS": 1000,
+    "TEST_DURATION_MS": 45000,
+    "MESSAGE_INTERVAL_MS": 3000,
+    "SHARD_URLS": [
+      "ws://localhost:5000",
+      "ws://localhost:5001",
+      "ws://localhost:5002",
+      "ws://localhost:5003"
+    ],
+    "SESSION_COUNT": 20
   },
   "summary": {
-    "totalConnections": 500,
-    "totalMessagesSent": 2249,
-    "totalMessagesReceived": 980118,
-    "successRate": "87.34",
-    "p50Latency": 3227,
-    "p95Latency": 10458,
-    "p99Latency": 11730,
+    "totalConnections": 1000,
+    "totalMessagesSent": 12410,
+    "totalMessagesReceived": 568088,
+    "successRate": "4.58",
+    "p50Latency": 5,
+    "p95Latency": 18,
+    "p99Latency": 34,
     "totalErrors": 0
   }
 }

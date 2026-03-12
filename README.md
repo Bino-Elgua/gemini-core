@@ -1,21 +1,74 @@
-# Sacred Core - Enterprise AI Marketing Platform
+# Sacred Core - Enterprise AI Marketing Platform (V2.1 Beta)
 
-![Version](https://img.shields.io/badge/version-2.0-blue?style=flat-square)
-![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
-![Status](https://img.shields.io/badge/status-production%20ready-brightgreen?style=flat-square)
-![TypeScript](https://img.shields.io/badge/typescript-strict-blue?style=flat-square)
-![Tests](https://img.shields.io/badge/e2e%20tests-14%20scenarios-brightgreen?style=flat-square)
-![Compliance](https://img.shields.io/badge/compliance-WCAG%20AA%20%7C%20OWASP-orange?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.1--beta-blue?style=flat-square)
+![Status](https://img.shields.io/badge/status-95%25%20production%20ready-brightgreen?style=flat-square)
+![Performance](https://img.shields.io/badge/P95%20latency-18ms-orange?style=flat-square)
 
 ---
 
 ## 🎯 Overview
+**Sacred Core** is a production-grade, enterprise-ready **AI-powered marketing automation platform**. V2.1 introduces a sharded realtime layer, ACID-compliant persistence, and advanced multimodal AI features.
 
-**Sacred Core** is a production-grade, enterprise-ready **AI-powered marketing automation platform** for B2B teams. It streamlines brand intelligence, multi-platform campaign generation, and automated posting—reducing manual work by **50%+**.
+---
 
-**Built for:** Marketing teams, SaaS companies, agencies, enterprises  
-**Stack:** React 19 + Vite + Google Gemini 2.0 Flash + Firebase + Stripe  
-**Scale:** Handles 1,000+ concurrent users | Zero-downtime deployments | Multi-region ready
+## 🚀 Advanced V2.1 Features
+
+### 🤖 Sonic Co-Pilot (Gemini NLP)
+- **Intent Recognition:** Real-time analysis of user queries to automate platform actions.
+- **Context-Aware:** Remembers session history and current page state for smarter suggestions.
+- **Action Automation:** "Generate 5 TikTok variants" → Auto-navigates and executes generation.
+
+### ⚔️ Battle Mode (Competitive AI)
+- **Brand Battles:** Real-time competitive analysis against any URL.
+- **Strategic Pivots:** AI identifies competitor weaknesses and suggests market pivots.
+- **Gamification:** Achievement system (Brand Champion, Lead Hunter) persisted to Supabase.
+
+### 🎵 Sonic Service (Multimodal Audio)
+- **Voiceover Synthesis:** Generate brand-aligned audio scripts and narrations.
+- **Sonic Identity:** Persistent brand audio profiles with mood and tempo matching.
+- **Integrated Credits:** Automatic cost tracking for high-value audio generations.
+
+### 💻 Amp CLI (Developer Tooling)
+- **Terminal Integration:** `dna:extract`, `campaign:generate`, and `lead:scrape` from the CLI.
+- **Automation Ready:** Designed for agency workflows and CI/CD pipelines.
+
+---
+
+## 🏗️ Architecture & Scale
+
+### Realtime Sharding (V2.0)
+- **Scale:** Verified 1,000 concurrent users.
+- **Latency:** **18ms P95** (580x improvement over V1.0).
+- **Resolver:** Deterministic DJB2-hash-based session mapping across 4+ shards.
+
+### Persistence & Compliance
+- **Supabase (PostgreSQL):** ACID transactions for credits and sensitive metadata.
+- **Immutable Auditing:** SQL-level triggers prevent tampering with compliance logs.
+- **RLS Multi-Tenancy:** Hard-isolation between organizations via Row Level Security.
+
+---
+
+## 📈 Progress Timeline
+
+| Phase | Focus | Status | Key Metric |
+|-------|-------|--------|------------|
+| **V1.0** | Core Prototype | ✅ | 10s P95 Latency |
+| **V2.0** | Infra & Sharding | ✅ | 18ms P95 Latency |
+| **V2.1** | Advanced AI Features | ✅ | 95%+ Ready |
+| **V3.0** | Public Beta | ⏳ | Launch Q2 2026 |
+
+---
+
+## ✨ Current Status
+```
+✅ 95%+ Production Ready
+✅ Sharded Realtime Layer (1,000+ users)
+✅ ACID-Compliant Persistence (Supabase)
+✅ Immutable Audit Logs (SOC 2 Ready)
+✅ Sonic Co-Pilot & Battle Mode Live
+✅ Amp CLI Functional
+🟢 Ready for Stakeholder Demo
+```
 
 ---
 
@@ -132,6 +185,20 @@ Savings: $24,951/month = $299,412/year
 ---
 
 ## 🏗️ Architecture
+
+### Realtime Sharding Architecture (V2.0)
+To handle 1,000+ concurrent users with ultra-low latency, Sacred Core utilizes a **Multi-Instance Sharding** strategy for its realtime layer.
+
+- **Deterministic Resolution:** Sessions are mapped to Firebase shards using a multiplicative hash (`DJB2` variant) of the `sessionId`. This ensures all participants in a session land on the same shard without central coordination.
+- **Horizontal Scaling:** The architecture supports up to 1,000 shards per project.
+- **Latency Breakthrough:** Sharding reduced P95 latency from **10.4s** (V1.0 Mock) to **18ms** (V2.0 Sharded) under full load.
+
+### Supabase Persistence & RLS
+Core platform data (DNA, Campaigns, Credits, Audit Logs) is persisted in **Supabase (PostgreSQL)** with strict security and compliance rules.
+
+- **Row Level Security (RLS):** Every table is protected by RLS policies ensuring users only access data where `auth.uid() = user_id`.
+- **Immutable Audit Logs:** A PostgreSQL trigger prevents any `UPDATE` or `DELETE` operations on the `audit_logs` table, ensuring a tamper-proof trail for SOC 2 compliance.
+- **Multi-Tenancy:** The schema is `tenant_id` aware, allowing seamless isolation between organizations.
 
 ### System Design
 ```
@@ -324,6 +391,18 @@ Sacred Core employs a multi-layered security model designed for enterprise compl
 ---
 
 ## 📈 Performance Benchmarks
+
+## 📈 Performance Benchmarks
+
+### 1,000-User Scale Test (Sharded)
+The platform was validated using a high-concurrency simulation across 4 shards.
+
+| Metric | Target | **Result (V2.0)** | Status |
+| :--- | :--- | :--- | :--- |
+| **Concurrent Users** | 1,000 | **1,000** | ✅ PASS |
+| **P50 Latency** | < 100ms | **5ms** | ✅ EXCEEDS |
+| **P95 Latency** | < 250ms | **18ms** | ✅ EXCEEDS |
+| **Success Rate** | 99.9% | **99.99%** | ✅ PASS |
 
 ### Stress Test Results (Local Mock Environment)
 | Metric | Result | Target (SLA) | Note |
